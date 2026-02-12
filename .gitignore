@@ -1,0 +1,33 @@
+# --- Python (Arquivos compilados) ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Ambientes Virtuais (Venvs) ---
+# Ignora pastas comuns de ambiente virtual para não enviar bibliotecas pesadas
+venv/
+.venv/
+env/
+.env
+
+# --- IDEs e Editores (Configurações pessoais) ---
+.vscode/
+.idea/
+*.swp
+
+# --- Sistema Operacional ---
+.DS_Store
+Thumbs.db
+
+# --- Distribuição / Instalação ---
+dist/
+build/
+*.egg-info/
+
+# --- Testes ---
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- Logs ---
+*.log
