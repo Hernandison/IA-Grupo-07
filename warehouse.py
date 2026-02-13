@@ -1,234 +1,179 @@
 import sys
-import math
-
-# Ajuste de caminho para garantir importação se rodado isoladamente ou via main
+# Certifique-se que a pasta 'aima' está acessível ou os arquivos search.py/agents.py estão no mesmo diretório
 sys.path.append('./aima')
 
 from search import Problem, astar_search
 from agents import Agent, Environment
 
 # =============================================================================
-# 1. A MODELAGEM DO PROBLEMA (BUSCA A*)
+# 1. PROBLEMA DE BUSCA (A*)
 # =============================================================================
 
 class WarehouseProblem(Problem):
-    """
-    Define o problema matemático de busca (Estados e Ações).
-    
-    Estados: Tupla (x, y, status_caixa)
-        - x, y: Coordenadas na grade.
-        - status_caixa: 
-            0 = Caixa na prateleira (Precisa buscar)
-            1 = Caixa com o robô (Carregando)
-            2 = Caixa entregue (Objetivo final)
-    """
-
-    def __init__(self, initial, grid_map, box_pos, delivery_pos):
-        # O objetivo é definido customizadamente em goal_test, então goal=None
+    def __init__(self, initial, obstacles, target, delivery_pos, width=10, height=10):
         super().__init__(initial, goal=None)
-        
-        self.grid_map = grid_map
-        self.box_pos = box_pos
+        self.obstacles = obstacles # Posições que não são o alvo, mas bloqueiam
+        self.target = target       # Onde queremos chegar (Prateleira ou Balcão)
         self.delivery_pos = delivery_pos
-        self.width = 10  
-        self.height = 10
+        self.width, self.height = width, height
 
     def actions(self, state):
-        """Retorna a lista de ações válidas para o estado atual."""
         actions_list = []
-        x, y, status = state
-
-        # 1. Movimentos Básicos
-        moves = {
-            'Move(Norte)': (0, -1),
-            'Move(Sul)':   (0, 1),
-            'Move(Oeste)': (-1, 0),
-            'Move(Leste)': (1, 0)
-        }
-
+        x, y, status = state 
+        
+        # Norte, Sul, Oeste, Leste
+        moves = {'N': (0, -1), 'S': (0, 1), 'W': (-1, 0), 'E': (1, 0)}
+        
         for action_name, (dx, dy) in moves.items():
             nx, ny = x + dx, y + dy
-            # Verifica limites da grade (0-9) e se não é parede
-            if (0 <= nx < self.width) and (0 <= ny < self.height) and ((nx, ny) not in self.grid_map):
-                actions_list.append(action_name)
+            # Verifica limites
+            if 0 <= nx < self.width and 0 <= ny < self.height:
+                # Pode andar se não for obstáculo OU se for o próprio alvo
+                if (nx, ny) not in self.obstacles or (nx, ny) == self.target:
+                    actions_list.append(action_name)
 
-        # 2. Lógica de PEGAR (PickUp)
-        # Condição: Estar no local da caixa E a caixa ainda estar lá (status 0)
-        if (x, y) == self.box_pos and status == 0:
-            actions_list.append('PickUp')
-
-        # 3. Lógica de SOLTAR (DropOff)
-        # Condição: Estar no local de entrega E estar carregando a caixa (status 1)
-        if (x, y) == self.delivery_pos and status == 1:
-            actions_list.append('DropOff')
-
+        # Ações de interação
+        if (x, y) == self.target:
+            if status == 0: actions_list.append('PickUp') # Pegar na prateleira
+            if status == 1: actions_list.append('DropOff') # Entregar no balcão
+            
         return actions_list
 
     def result(self, state, action):
-        """Retorna o novo estado (simulado) após aplicar a ação."""
         x, y, status = state
-
-        if 'Move' in action:
-            if 'Norte' in action: y -= 1
-            if 'Sul'   in action: y += 1
-            if 'Oeste' in action: x -= 1
-            if 'Leste' in action: x += 1
-            return (x, y, status)
-
-        elif action == 'PickUp':
-            return (x, y, 1) # Robô agora tem a caixa
-
-        elif action == 'DropOff':
-            return (x, y, 2) # Caixa foi entregue
-
-        return state
+        if action == 'N': y -= 1
+        elif action == 'S': y += 1
+        elif action == 'W': x -= 1
+        elif action == 'E': x += 1
+        elif action == 'PickUp': return (x, y, 1)
+        elif action == 'DropOff': return (x, y, 2)
+        return (x, y, status)
 
     def goal_test(self, state):
-        """O objetivo é atingido apenas quando o status é 2 (Entregue)."""
-        return state[2] == 2
+        # O objetivo é ter realizado a ação final (status 2 = entregue ou status 1 = pegou, depende do sub-objetivo)
+        # Mas para simplificar, o A* busca o caminho até chegar na posição.
+        # A lógica do agente decide quando parar o A* e executar a ação.
+        return False # Não usado diretamente no loop simples, usamos pathing
 
     def h(self, node):
-        """
-        Função Heurística (Distância Manhattan).
-        Guia o A* para ser inteligente e não apenas aleatório.
-        """
         x, y, status = node.state
-        
-        def manhattan(p1, p2):
-            return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
-
-        if status == 0:
-            # Se não pegou a caixa: Custo para ir até a caixa + custo da caixa até a entrega
-            return manhattan((x, y), self.box_pos) + manhattan(self.box_pos, self.delivery_pos)
-        
-        elif status == 1:
-            # Se já pegou: Custo para ir até a entrega
-            return manhattan((x, y), self.delivery_pos)
-        
-        else:
-            # Se entregou: Custo zero (chegou)
-            return 0
+        def dist(p1, p2): return abs(p1[0] - p2[0]) + abs(p1[1] - p2[1])
+        # Heurística simples: Distância Manhattan até o alvo atual
+        return dist((x, y), self.target)
 
 # =============================================================================
-# 2. O AGENTE (CÉREBRO)
+# 2. O AGENTE
 # =============================================================================
 
 class WarehouseAgent(Agent):
-    """
-    O Agente que vive no ambiente.
-    Ciclo: Perceber -> Planejar (usando A*) -> Agir
-    """
-    def __init__(self, start_pos, grid_map, box_pos, delivery_pos):
-        super().__init__()
-        # Estado mental inicial do agente
-        self.state = (start_pos[0], start_pos[1], 0)
-        self.grid_map = grid_map
-        self.box_pos = box_pos
+    def __init__(self, start_pos, shelves_data, delivery_pos, grid_w, grid_h):
+        super().__init__(self.agent_program)
+        self.grid_w = grid_w
+        self.grid_h = grid_h
+        # shelves_data é um dict {(x,y): quantidade}
+        self.shelves_memory = shelves_data.copy() 
         self.delivery_pos = delivery_pos
-        
-        self.plan = [] # Fila de ações para executar
+        self.plan = []
+        self.current_target = None
 
-    def execute(self, percept):
-        """Chamado automaticamente pelo Environment a cada passo."""
-        
-        # 1. Interpretar Percepção (Atualizar onde estou)
+    def agent_program(self, percept):
         current_pos = percept['pos']
         has_box = percept['has_box']
         
-        # Lógica para manter o estado 2 (Entregue) se já tiver entregue
-        status = 1 if has_box else (2 if self.state[2] == 2 else 0)
-        self.state = (current_pos[0], current_pos[1], status)
-
-        # 2. Verificar Objetivo
-        if status == 2:
-            return 'NoOp' # Missão cumprida, descansa.
-
-        # 3. Deliberação (Planejamento)
-        # Se a fila de planos acabou, calcula uma nova rota
-        if not self.plan:
-            print(f"\n[Agente] Calculando rota A* a partir de {self.state}...")
-            
-            problem = WarehouseProblem(self.state, self.grid_map, self.box_pos, self.delivery_pos)
-            solution_node = astar_search(problem)
-            
-            if solution_node:
-                self.plan = solution_node.solution()
-                print(f"[Agente] Plano gerado: {self.plan}")
-            else:
-                print("[Agente] ERRO: Caminho bloqueado ou impossível!")
-                return 'NoOp'
-
-        # 4. Ação
+        # Se tem plano, executa
         if self.plan:
-            action = self.plan.pop(0) # Pega a próxima ação da fila
-            return action
-        
+            return self.plan.pop(0)
+
+        # Se não tem plano, decide o que fazer
+        if has_box:
+            # 1. Levar ao balcão
+            # Obstáculos são todas as prateleiras (exceto o balcão se fosse obstáculo)
+            obstacles = set(self.shelves_memory.keys())
+            prob = WarehouseProblem((current_pos[0], current_pos[1], 1), obstacles, self.delivery_pos, self.delivery_pos, self.grid_w, self.grid_h)
+            prob.goal_test = lambda state: state[0:2] == self.delivery_pos
+            
+            node = astar_search(prob)
+            if node:
+                self.plan = node.solution()
+                self.plan.append('DropOff')
+                return self.plan.pop(0) if self.plan else 'NoOp'
+                
+        else:
+            # 2. Buscar item
+            # Filtrar prateleiras com itens > 0
+            available_shelves = [pos for pos, count in self.shelves_memory.items() if count > 0]
+            
+            if not available_shelves:
+                return 'NoOp' # Acabou o trabalho
+
+            # Escolher a mais próxima
+            available_shelves.sort(key=lambda p: abs(p[0]-current_pos[0]) + abs(p[1]-current_pos[1]))
+            target = available_shelves[0]
+            
+            # Obstáculos são todas as prateleiras MENOS a alvo (precisamos entrar nela/ficar em cima)
+            obstacles = set(self.shelves_memory.keys()) - {target}
+            
+            prob = WarehouseProblem((current_pos[0], current_pos[1], 0), obstacles, target, self.delivery_pos, self.grid_w, self.grid_h)
+            prob.goal_test = lambda state: state[0:2] == target
+            
+            node = astar_search(prob)
+            if node:
+                self.plan = node.solution()
+                self.plan.append('PickUp')
+                self.current_target = target # Memoriza onde está indo
+                return self.plan.pop(0) if self.plan else 'NoOp'
+
         return 'NoOp'
 
 # =============================================================================
-# 3. O AMBIENTE (FÍSICA/SIMULAÇÃO)
+# 3. O AMBIENTE
 # =============================================================================
 
 class WarehouseEnvironment(Environment):
-    """
-    Representa o mundo real (Almoxarifado).
-    Valida se o robô bateu na parede e se pegou a caixa de verdade.
-    """
-    def __init__(self, width, height, walls, box_pos, delivery_pos):
+    def __init__(self, width, height, shelves_data, delivery_pos):
         super().__init__()
-        self.width = width
-        self.height = height
-        self.walls = walls
-        self.box_pos = box_pos
+        self.width, self.height = width, height
+        # shelves_data: {(x,y): int_quantidade}
+        self.shelves = shelves_data 
         self.delivery_pos = delivery_pos
-        
-        # Dicionário para guardar o estado real de cada agente no mundo
-        self.agents_data = {} 
+        self.agents_data = {}
 
-    def add_thing(self, agent, location=None):
+    def add_thing(self, agent, location=(0,0)):
         super().add_thing(agent, location)
-        # Define estado inicial real no ambiente
-        self.agents_data[agent] = {'pos': location, 'has_box': False}
+        self.agents_data[agent] = {'pos': location, 'has_box': False, 'items_delivered': 0, 'last_action': None}
 
     def percept(self, agent):
-        """O que o agente consegue sentir/ver."""
-        data = self.agents_data[agent]
-        return {'pos': data['pos'], 'has_box': data['has_box']}
+        # O agente precisa saber o estado atualizado das prateleiras para decidir
+        # (Em uma simulação real, ele teria que ver, aqui passamos a memória atualizada)
+        agent.shelves_memory = self.shelves.copy()
+        return self.agents_data[agent]
 
     def execute_action(self, agent, action):
-        """Executa a ação física e printa o log."""
         data = self.agents_data[agent]
         x, y = data['pos']
+        data['last_action'] = action
 
-        if action == 'NoOp':
-            return
-
-        elif 'Move' in action:
-            nx, ny = x, y
-            if 'Norte' in action: ny -= 1
-            if 'Sul'   in action: ny += 1
-            if 'Oeste' in action: nx -= 1
-            if 'Leste' in action: nx += 1
-
-            # Checagem de colisão real
-            if (nx, ny) in self.walls:
-                print(f"   [Ambiente] BLOQUEADO: Agente bateu na parede em ({nx}, {ny})")
-            elif not (0 <= nx < self.width and 0 <= ny < self.height):
-                print(f"   [Ambiente] BLOQUEADO: Agente tentou sair do mapa")
-            else:
+        moves = {'N': (0, -1), 'S': (0, 1), 'W': (-1, 0), 'E': (1, 0)}
+        
+        if action in moves:
+            dx, dy = moves[action]
+            nx, ny = x + dx, y + dy
+            # Checagem básica de colisão (o A* deve evitar, mas o ambiente garante)
+            # Permitimos entrar na prateleira para pegar o item (abstração de "ficar na frente")
+            if 0 <= nx < self.width and 0 <= ny < self.height:
                 data['pos'] = (nx, ny)
-                print(f"   [Ambiente] Agente moveu para {data['pos']}")
 
         elif action == 'PickUp':
-            if (x, y) == self.box_pos and not data['has_box']:
+            if data['pos'] in self.shelves and self.shelves[data['pos']] > 0 and not data['has_box']:
+                self.shelves[data['pos']] -= 1
                 data['has_box'] = True
-                print("   [Ambiente] --- CAIXA COLETADA! ---")
-            else:
-                print("   [Ambiente] Ação PickUp ignorada (local incorreto).")
 
         elif action == 'DropOff':
-            if (x, y) == self.delivery_pos and data['has_box']:
+            if data['pos'] == self.delivery_pos and data['has_box']:
                 data['has_box'] = False
-                print("   [Ambiente] >>> CAIXA ENTREGUE COM SUCESSO! <<<")
-            else:
-                print("   [Ambiente] Ação DropOff ignorada.")
+                data['items_delivered'] += 1
+
+    def is_done(self):
+        total_items_left = sum(self.shelves.values())
+        agents_carrying = any(d['has_box'] for d in self.agents_data.values())
+        return total_items_left == 0 and not agents_carrying
