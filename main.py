@@ -1,15 +1,17 @@
 import sys
-import time
+import os
 
-# Adiciona a pasta 'aima' ao caminho do sistema para garantir que as importações funcionem
-# (Caso o warehouse.py ainda não tenha feito isso ou para garantir redundância)
-sys.path.append('./aima')
+# Adiciona a pasta 'aima' ao path de forma absoluta para garantir que a biblioteca
+# consiga carregar seus próprios arquivos internos sem erros de "ModuleNotFoundError".
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'aima')))
 
 try:
-    from warehouse import WarehouseEnvironment, WarehouseAgent
+    # Importações atualizadas refletindo a nova estrutura de diretórios e classes em português
+    from env.ambiente_almoxarifado import AmbienteAlmoxarifado
+    from agents.agente_almoxarifado import AgenteAlmoxarifado
 except ImportError as e:
     print("ERRO DE IMPORTAÇÃO:")
-    print("Certifique-se de que o arquivo 'warehouse.py' está na mesma pasta que o 'main.py'.")
+    print("Certifique-se de que as pastas '/env' e '/agents' existem e contêm os arquivos corretos.")
     print(f"Detalhe do erro: {e}")
     sys.exit(1)
 
@@ -21,29 +23,36 @@ def main():
     # ---------------------------------------------------------
     # 1. DEFINIÇÃO DO CENÁRIO (LAYOUT DO DEPÓSITO)
     # ---------------------------------------------------------
-    width = 10
-    height = 10
-    
-    # Definindo as Paredes (Simulando prateleiras do almoxarifado)
-    # O agente terá que contornar isso usando o algoritmo A*
-    walls = [
-        (2, 0), (2, 1), (2, 2),          # Prateleira Esquerda Superior
-        (2, 4), (2, 5), (2, 6),          # Prateleira Esquerda Inferior
-        (5, 5), (5, 6), (5, 7), (5, 8),  # Prateleira Central
-        (7, 1), (7, 2), (7, 3),          # Prateleira Direita
-        (8, 5)                           # Obstáculo solto
-    ]
+    largura = 10
+    altura = 10
     
     # Posições Chave
-    start_pos = (0, 0)         # Início (Entrada do Depósito)
-    box_location = (9, 0)      # Onde está o item a ser buscado (Canto superior direito)
-    delivery_location = (0, 9) # Onde deve ser entregue (Canto inferior esquerdo)
+    pos_inicial = (0, 0)       # Início (Entrada do Depósito)
+    pos_entrega = (0, 9)       # Onde deve ser entregue (Canto inferior esquerdo - Balcão)
 
-    print(f"-> Mapa: {width}x{height}")
-    print(f"-> Agente Inicia em: {start_pos}")
-    print(f"-> Caixa (Alvo) em:  {box_location}")
-    print(f"-> Zona de Entrega:  {delivery_location}")
-    print(f"-> Obstáculos:       {len(walls)} blocos de parede")
+    # Definindo as Prateleiras e Obstáculos
+    # O dicionário mapeia {(x, y): quantidade_de_itens_disponiveis}
+    # Prateleiras com 0 itens funcionam estritamente como obstáculos físicos (paredes)
+    prateleiras = {
+        # Prateleira Esquerda Superior
+        (2, 0): 0, (2, 1): 0, (2, 2): 0,
+        # Prateleira Esquerda Inferior
+        (2, 4): 0, (2, 5): 0, (2, 6): 0,
+        # Prateleira Central
+        (5, 5): 0, (5, 6): 0, (5, 7): 0, (5, 8): 0,
+        # Prateleira Direita
+        (7, 1): 0, (7, 2): 0, (7, 3): 0,
+        # Obstáculo solto
+        (8, 5): 0,
+        
+        # Onde está o item a ser buscado (Canto superior direito)
+        (9, 0): 1  
+    }
+
+    print(f"-> Mapa: {largura}x{altura}")
+    print(f"-> Agente Inicia em: {pos_inicial}")
+    print(f"-> Zona de Entrega:  {pos_entrega}")
+    print(f"-> Prateleiras/Obstáculos: {len(prateleiras)} blocos registrados")
     print("-" * 60)
 
     # ---------------------------------------------------------
@@ -51,15 +60,15 @@ def main():
     # ---------------------------------------------------------
     
     # Cria o Ambiente Físico (Simulação)
-    env = WarehouseEnvironment(width, height, walls, box_location, delivery_location)
+    # Passamos uma cópia do dicionário para que o ambiente gerencie o estado real
+    ambiente = AmbienteAlmoxarifado(largura, altura, prateleiras.copy(), pos_entrega)
 
     # Cria o Agente Inteligente
-    # Note que passamos 'walls' para o agente. Isso representa que ele tem o "mapa da planta"
-    # do prédio na memória dele, permitindo planejar a rota antes de andar.
-    robot = WarehouseAgent(start_pos, walls, box_location, delivery_location)
+    # Passamos uma cópia para que o agente tenha a sua própria "memória" do mapa
+    agente = AgenteAlmoxarifado(pos_inicial, prateleiras.copy(), pos_entrega, largura, altura)
 
     # Adiciona o Agente ao Ambiente na posição inicial
-    env.add_thing(robot, location=start_pos)
+    ambiente.add_thing(agente, location=pos_inicial)
 
     # ---------------------------------------------------------
     # 3. EXECUÇÃO DA SIMULAÇÃO
@@ -67,8 +76,8 @@ def main():
     print("Iniciando simulação do agente...\n")
     
     # Rodamos por um número máximo de passos para evitar loops infinitos caso algo dê errado
-    # O agente deve imprimir seus planos (A*) e o ambiente deve imprimir os movimentos.
-    env.run(steps=60)
+    # A cada passo, o ambiente chamará o método render() que acabamos de adicionar
+    ambiente.run(steps=60)
 
     print("\n===========================================================")
     print("                  FIM DA SIMULAÇÃO")

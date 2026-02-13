@@ -2,8 +2,14 @@ import tkinter as tk
 from tkinter import messagebox
 import math
 import time
-from warehouse import WarehouseEnvironment, WarehouseAgent
+import sys
 
+
+import aima.utils
+sys.modules['utils'] = aima.utils
+
+from env.ambiente_almoxarifado import AmbienteAlmoxarifado
+from agents.agente_almoxarifado import AgenteAlmoxarifado
 # =============================================================================
 # CONFIGURAÇÃO VISUAL (PALETA DE CORES 16-BIT)
 # =============================================================================
@@ -13,15 +19,15 @@ COR_PAINEL = "#1e272e"       # Painel Lateral Escuro
 COR_TEXTO = "#ffffff"        # Texto Branco
 
 # Elementos do Jogo
-COR_PRATELEIRA_TOPO = "#e67e22"  # Laranja Tijolo
+COR_PRATELEIRA_TOPO = "#e67e22"    # Laranja Tijolo
 COR_PRATELEIRA_LATERAL = "#d35400" # Sombra Tijolo
 COR_ITEM = "#f1c40f"         # Amarelo Moeda
 COR_BALCAO_FUNDO = "#27ae60" # Verde Fundo
 COR_BALCAO_BORDA = "#2ecc71" # Verde Claro Borda
 
 # Robô
-COR_ROBO_CORPO = "#0984e3"   # Azul Mega Man
-COR_ROBO_DETALHE = "#74b9ff" # Azul Claro
+COR_ROBO_CORPO = "#0984e3"      # Azul Mega Man
+COR_ROBO_DETALHE = "#74b9ff"    # Azul Claro
 COR_ROBO_CARREGANDO = "#8e44ad" # Roxo (Quando tem item)
 
 # Fontes
@@ -29,15 +35,15 @@ FONTE_TITULO = ("Courier New", 16, "bold")
 FONTE_UI = ("Courier New", 10, "bold")
 FONTE_NUMERO = ("Courier New", 14, "bold")
 
-class SuperWarehouseGame:
+class JogoSuperAlmoxarifado:
     def __init__(self, root):
         self.root = root
-        self.root.title("WAREHOUSE QUEST - GRUPO 07")
+        self.root.title("MISSÃO ALMOXARIFADO - GRUPO 07")
         self.root.configure(bg=COR_FUNDO)
         
         # Configurações do Grid
-        self.grid_w, self.grid_h = 10, 10
-        self.cell_size = 60
+        self.largura_grid, self.altura_grid = 10, 10
+        self.tamanho_celula = 60
         
         # Estados do Jogo
         self.prateleiras = {} # Dict {(x,y): quantidade}
@@ -109,7 +115,7 @@ class SuperWarehouseGame:
         container_canvas = tk.Frame(self.root, bg=COR_FUNDO, bd=10, relief=tk.FLAT)
         container_canvas.pack(side=tk.RIGHT, expand=True, fill=tk.BOTH, padx=20, pady=20)
         
-        self.canvas = tk.Canvas(container_canvas, width=self.grid_w*self.cell_size, height=self.grid_h*self.cell_size, 
+        self.canvas = tk.Canvas(container_canvas, width=self.largura_grid*self.tamanho_celula, height=self.altura_grid*self.tamanho_celula, 
                                 bg="#2f3640", highlightthickness=2, highlightbackground="#7f8c8d")
         self.canvas.pack(expand=True)
         self.canvas.bind("<Button-1>", lambda e: self.ao_clicar(e, 1))  # Botão Esquerdo
@@ -118,52 +124,52 @@ class SuperWarehouseGame:
     def desenhar_grid_estatico(self):
         """Desenha o chão quadriculado"""
         self.canvas.delete("grid")
-        w, h = self.grid_w, self.grid_h
-        sz = self.cell_size
+        largura, altura = self.largura_grid, self.altura_grid
+        tam = self.tamanho_celula
         
-        for y in range(h):
-            for x in range(w):
+        for y in range(altura):
+            for x in range(largura):
                 # Padrão xadrez sutil
                 cor = "#353b48" if (x + y) % 2 == 0 else "#3d4655"
-                self.canvas.create_rectangle(x*sz, y*sz, (x+1)*sz, (y+1)*sz, fill=cor, outline="", tags="grid")
+                self.canvas.create_rectangle(x*tam, y*tam, (x+1)*tam, (y+1)*tam, fill=cor, outline="", tags="grid")
                 # Pontinhos nos cantos para dar ar técnico
-                self.canvas.create_oval(x*sz-1, y*sz-1, x*sz+1, y*sz+1, fill=COR_GRID, tags="grid")
+                self.canvas.create_oval(x*tam-1, y*tam-1, x*tam+1, y*tam+1, fill=COR_GRID, tags="grid")
 
         self.desenhar_elementos()
 
     def desenhar_elementos(self):
         """Renderiza prateleiras, balcão e itens"""
         self.canvas.delete("elementos")
-        sz = self.cell_size
+        tam = self.tamanho_celula
         
         # 1. Ponto de Entrega (Base)
         if self.pos_entrega:
             dx, dy = self.pos_entrega
-            cx, cy = dx * sz, dy * sz
-            pad = 4
+            cx, cy = dx * tam, dy * tam
+            margem = 4
             # Borda tracejada
-            self.canvas.create_rectangle(cx+pad, cy+pad, cx+sz-pad, cy+sz-pad, 
+            self.canvas.create_rectangle(cx+margem, cy+margem, cx+tam-margem, cy+tam-margem, 
                                        outline="white", width=2, dash=(4, 4), tags="elementos")
             # Fundo colorido
-            self.canvas.create_rectangle(cx+10, cy+10, cx+sz-10, cy+sz-10,
+            self.canvas.create_rectangle(cx+10, cy+10, cx+tam-10, cy+tam-10,
                                        fill=COR_BALCAO_FUNDO, outline=COR_BALCAO_BORDA, width=2, tags="elementos")
-            self.canvas.create_text(cx + sz/2, cy + sz/2,
+            self.canvas.create_text(cx + tam/2, cy + tam/2,
                                   text="FIM", fill="white", font=("Courier New", 10, "bold"), tags="elementos")
 
         # 2. Prateleiras (Blocos 3D)
         for (x, y), qtd in self.prateleiras.items():
-            cx, cy = x * sz, y * sz
-            pad = 3
+            cx, cy = x * tam, y * tam
+            margem = 3
             
             # Sombra (Lateral) para efeito 3D
-            self.canvas.create_rectangle(cx+pad+4, cy+pad+4, cx+sz-pad, cy+sz-pad,
+            self.canvas.create_rectangle(cx+margem+4, cy+margem+4, cx+tam-margem, cy+tam-margem,
                                        fill="#1e272e", outline="", tags="elementos")
             # Face Frontal
-            self.canvas.create_rectangle(cx+pad, cy+pad, cx+sz-pad-4, cy+sz-pad-4, 
+            self.canvas.create_rectangle(cx+margem, cy+margem, cx+tam-margem-4, cy+tam-margem-4, 
                                        fill=COR_PRATELEIRA_TOPO, outline="black", width=1, tags="elementos")
             # Detalhe Lateral
-            self.canvas.create_line(cx+sz-pad-4, cy+pad, cx+sz-pad-4, cy+sz-pad-4, fill=COR_PRATELEIRA_LATERAL, width=2, tags="elementos")
-            self.canvas.create_line(cx+pad, cy+sz-pad-4, cx+sz-pad-4, cy+sz-pad-4, fill=COR_PRATELEIRA_LATERAL, width=2, tags="elementos")
+            self.canvas.create_line(cx+tam-margem-4, cy+margem, cx+tam-margem-4, cy+tam-margem-4, fill=COR_PRATELEIRA_LATERAL, width=2, tags="elementos")
+            self.canvas.create_line(cx+margem, cy+tam-margem-4, cx+tam-margem-4, cy+tam-margem-4, fill=COR_PRATELEIRA_LATERAL, width=2, tags="elementos")
 
             # Contador de Itens
             if qtd > 0:
@@ -182,8 +188,8 @@ class SuperWarehouseGame:
         
         # Define posição (inicial ou animada)
         ax, ay = self.pos_inicio_agente if not self.em_execucao else self.pos_visual_agente
-        sz = self.cell_size
-        cx, cy = ax * sz, ay * sz
+        tam = self.tamanho_celula
+        cx, cy = ax * tam, ay * tam
         
         cor_corpo = COR_ROBO_CARREGANDO if self.agente_tem_caixa else COR_ROBO_CORPO
         
@@ -214,16 +220,17 @@ class SuperWarehouseGame:
         total_itens = sum(self.prateleiras.values())
         self.lbl_itens.config(text=f"{total_itens:02d}")
         
-        if hasattr(self, 'env') and self.agente in self.env.agents_data:
-            entregues = self.env.agents_data[self.agente]['items_delivered']
+        # Usando a nova estrutura para buscar os dados no ambiente
+        if hasattr(self, 'ambiente') and self.agente in self.ambiente.dados_agentes:
+            entregues = self.ambiente.dados_agentes[self.agente]['itens_entregues']
             self.lbl_entregues.config(text=f"{entregues:03d}")
 
     def ao_clicar(self, evento, mudanca_valor):
         if self.em_execucao: return
-        gx, gy = evento.x // self.cell_size, evento.y // self.cell_size
+        gx, gy = evento.x // self.tamanho_celula, evento.y // self.tamanho_celula
         
         # Verifica se clicou dentro do grid
-        if not (0 <= gx < self.grid_w and 0 <= gy < self.grid_h): return
+        if not (0 <= gx < self.largura_grid and 0 <= gy < self.altura_grid): return
 
         modo = self.modo_edicao.get()
         
@@ -276,10 +283,10 @@ class SuperWarehouseGame:
         self.em_execucao = True
         self.btn_iniciar.config(state=tk.DISABLED, bg="#7f8c8d", text="EM ANDAMENTO...")
         
-        # Inicializa Lógica (WarehouseEnvironment)
-        self.env = WarehouseEnvironment(self.grid_w, self.grid_h, self.prateleiras.copy(), self.pos_entrega)
-        self.agente = WarehouseAgent(self.pos_inicio_agente, self.prateleiras.copy(), self.pos_entrega, self.grid_w, self.grid_h)
-        self.env.add_thing(self.agente, location=self.pos_inicio_agente)
+        # Inicializa Lógica usando nossas classes traduzidas
+        self.ambiente = AmbienteAlmoxarifado(self.largura_grid, self.altura_grid, self.prateleiras.copy(), self.pos_entrega)
+        self.agente = AgenteAlmoxarifado(self.pos_inicio_agente, self.prateleiras.copy(), self.pos_entrega, self.largura_grid, self.altura_grid)
+        self.ambiente.add_thing(self.agente, location=self.pos_inicio_agente)
         
         self.pos_visual_agente = list(self.pos_inicio_agente)
         self.passo_logico()
@@ -287,20 +294,20 @@ class SuperWarehouseGame:
     def passo_logico(self):
         if not self.em_execucao: return
         
-        if self.env.is_done():
+        if self.ambiente.is_done():
             self.em_execucao = False
             self.btn_iniciar.config(state=tk.NORMAL, bg="#27ae60", text="INICIAR MISSÃO")
             messagebox.showinfo("Sucesso", "Missão Cumprida!\nTodas as entregas realizadas.")
             return
 
         # Executa 1 passo na lógica
-        self.env.step()
+        self.ambiente.step()
         
-        # Sincroniza dados para visualização
-        dados_agente = self.env.agents_data[self.agente]
-        pos_destino = dados_agente['pos']
-        self.agente_tem_caixa = dados_agente['has_box']
-        self.prateleiras = self.env.shelves.copy() 
+        # Sincroniza dados para visualização extraindo os dados do ambiente
+        dados_agente = self.ambiente.dados_agentes[self.agente]
+        pos_destino = dados_agente['posicao']
+        self.agente_tem_caixa = dados_agente['tem_caixa']
+        self.prateleiras = self.ambiente.prateleiras.copy() 
         
         self.desenhar_elementos()
         self.animar_movimento(pos_destino)
@@ -342,5 +349,5 @@ if __name__ == "__main__":
     y = (altura_tela/2) - (700/2)
     root.geometry(f"950x700+{int(x)}+{int(y)}")
     
-    app = SuperWarehouseGame(root)
+    app = JogoSuperAlmoxarifado(root)
     root.mainloop()
