@@ -7,8 +7,7 @@ __pycache__/
 # Ignora pastas comuns de ambiente virtual para não enviar bibliotecas pesadas
 venv/
 .venv/
-env/
-.env
+
 
 # --- IDEs e Editores (Configurações pessoais) ---
 .vscode/
