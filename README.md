@@ -80,16 +80,16 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 
-MODO TERMINAL:
+#MODO TERMINAL:
 
 python main.py
 
 
-MODO INTERFACE:
+#MODO INTERFACE:
 
 python interface.py
 
 
-TESTES PYTESTS:
+#TESTES PYTESTS:
 
 pytest tests/teste_almoxarifado.py -v
