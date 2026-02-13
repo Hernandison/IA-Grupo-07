@@ -1,115 +1,78 @@
+# 🤖 Agente Inteligente de Almoxarifado (Warehouse Robot)
 
-🤖 Agente Inteligente de Almoxarifado (Warehouse Robot)
+**Disciplina:** Inteligência Artificial  
+**Grupo:** 07  
+**Integrantes:** Niceu Santos Biriba, Hernandison da Silva Bispo, Letícia, João Marcos  
 
-Disciplina: Inteligência Artificial
-Grupo: 07
-Integrantes: Niceu Santos Biriba, Hernandison da Silva Bispo, Letícia, João Marcos
+---
 
-📖 Descrição do Projeto
+## 📖 Descrição do Projeto
 
-Este projeto implementa um Agente Racional Baseado em Objetivos para atuar na logística de um almoxarifado automatizado. O problema foi modelado como um ambiente de grade (Grid World) onde o agente deve planejar rotas inteligentes para:
+Este projeto implementa um **Agente Racional Baseado em Objetivos** aplicado à logística de um almoxarifado automatizado.
 
-Navegar através de obstáculos dinâmicos (prateleiras).
+O problema foi modelado como um **ambiente de grade (Grid World)**, no qual o agente deve planejar rotas inteligentes para:
 
-Localizar e Coletar itens distribuídos no armazém.
+- Navegar através de obstáculos dinâmicos (prateleiras);
+- Localizar e coletar itens distribuídos no armazém;
+- Transportar os itens até a zona de entrega (Balcão).
 
-Transportar os itens até a zona de entrega (Balcão).
+A solução utiliza a arquitetura **Ambiente – Agente – Programa de Agente** e aplica o algoritmo de busca **A\*** (A-Star), inspirado na abordagem de Russell & Norvig, para encontrar o caminho mais curto até os objetivos.
 
-A solução utiliza a arquitetura Ambiente - Agente - Programa de Agente e aplica algoritmos de busca competitiva (Busca A*) da biblioteca baseada em Russell & Norvig para encontrar o caminho mais curto.
+---
 
-✨ Principais Funcionalidades
+## ✨ Principais Funcionalidades
 
-Interface Gráfica Interativa: Visualização em tempo real com estética "Retro/16-bit".
+- 🎮 Interface Gráfica Interativa com estética "Retro/16-bit"
+- 🛠 Editor de Cenário para criação de layouts personalizados
+- 🧠 Pathfinding com A\* (heurística Manhattan)
+- 📦 Múltiplas Entregas com coleta sequencial de itens
+- 🔄 Replanejamento automático para o item mais próximo
 
-Editor de Cenário: Permite criar layouts personalizados de prateleiras e obstáculos.
+---
 
-Pathfinding A:* O robô recalcula rotas automaticamente para buscar o item mais próximo.
+## 📂 Estrutura do Projeto
 
-Múltiplas Entregas: Suporte para coleta sequencial de vários itens antes de finalizar a missão.
 
-📂 Estrutura do Projeto
+### 📄 Descrição dos Arquivos
 
-interface.py: Arquivo principal. Contém a interface gráfica (GUI) em Tkinter e o loop de animação.
+- **interface.py**  
+  Responsável pela interface gráfica e controle da simulação.
 
-warehouse.py: Contém a lógica da Inteligência Artificial (Ambiente, Agente e Algoritmo A*).
+- **warehouse.py**  
+  Implementa o ambiente, o agente racional e o algoritmo A\*.
 
-aima/: (Opcional) Diretório contendo as bibliotecas auxiliares de IA (search.py, agents.py), caso não estejam instaladas via pip.
+- **aima/** (opcional)  
+  Contém arquivos auxiliares baseados na biblioteca AIMA (caso não estejam instalados via `pip`).
 
-🚀 Instalação e Execução
-Pré-requisitos
+---
 
-Python 3.8 ou superior.
+## 🚀 Instalação e Execução
 
-Biblioteca tkinter (geralmente já vem instalada com o Python).
+### 📌 Pré-requisitos
 
-Passo a Passo
+- Python 3.8 ou superior
+- Tkinter (normalmente já incluso na instalação padrão do Python)
 
-Clone ou baixe este repositório para sua máquina local.
+---
 
-(Opcional) Crie e ative um ambiente virtual.
+### 🔧 Passo a Passo
 
-Instale as dependências necessárias (caso utilize bibliotecas externas):
+1. Clone este repositório:
 
-code
-Bash
-download
-content_copy
-expand_less
+```bash
+git clone <URL_DO_REPOSITORIO>
+cd <NOME_DO_PROJETO>
+
+
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# Linux/macOS
+source venv/bin/activate
+
+
+
 pip install -r requirements.txt
 
-Execute o Simulador:
-Para abrir a interface gráfica e testar o agente, execute o comando abaixo no terminal:
 
-code
-Bash
-download
-content_copy
-expand_less
 python interface.py
-🎮 Guia de Uso do Simulador
-
-Ao executar o comando acima, uma janela gráfica será aberta. Siga os passos abaixo para configurar e rodar a simulação:
-
-1. Criando o Cenário (Painel Lateral)
-
-Use as ferramentas no menu "INVENTORY SELECT" à esquerda:
-
-📦 PRATELEIRA:
-
-Clique Esquerdo (Mouse): Adiciona uma prateleira ou aumenta a quantidade de itens nela.
-
-Clique Direito (Mouse): Diminui a quantidade de itens (se chegar a 0, a prateleira some).
-
-🏁 BALCÃO:
-
-Clique Esquerdo: Define o ponto de entrega (Goal). É obrigatório ter um balcão.
-
-🤖 PLAYER 1 (Agente):
-
-Clique Esquerdo: Define a posição inicial do robô.
-
-🧹 BORRACHA:
-
-Clique Esquerdo: Remove qualquer elemento da célula clicada.
-
-2. Executando a Missão
-
-Após configurar o cenário (garanta que há pelo menos 1 Prateleira com itens e 1 Balcão):
-
-Clique no botão "START MISSION".
-
-O robô irá planejar a rota, navegar até as prateleiras, coletar os itens (mudando de cor) e levá-los ao balcão.
-
-Acompanhe o progresso no placar SCORE e ITEMS.
-
-3. Reiniciando
-
-Para limpar o cenário ou tentar uma nova configuração, clique em "RESET STAGE".
-
-🛠 Tecnologias Utilizadas
-
-Linguagem: Python 3
-
-Interface Gráfica: Tkinter
-
-IA/Algoritmos: A* Search (Heurística Manhattan), Agentes Racionais.
