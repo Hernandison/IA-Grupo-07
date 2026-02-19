@@ -6,7 +6,7 @@
 
 ---
 
-## 1) 📖 Descrição do Projeto
+## 1) Descrição do Projeto
 
 Este projeto implementa um **Agente Racional Baseado em Objetivos** aplicado à logística de um almoxarifado automatizado.
 
@@ -47,7 +47,7 @@ Para cumprir os requisitos da disciplina, o projeto foi construído herdando as 
 
 ---
 
-## 2) ✅ Especificação Formal do Problema (AIMA) + Mapeamento no Código
+## 2) Especificação Formal do Problema (AIMA) + Mapeamento no Código
 
 O problema é resolvido como uma sequência de **subproblemas de navegação em grade** (ir até uma prateleira com item; depois ir até o balcão). Cada subproblema é modelado como uma instância de `ProblemaAlmoxarifado`.
 
@@ -88,7 +88,7 @@ O problema é resolvido como uma sequência de **subproblemas de navegação em 
 
 ---
 
-## 3) ✅ Classificação do Ambiente (AIMA)
+## 3) Classificação do Ambiente (AIMA)
 
 Classificação do ambiente do Almoxarifado, conforme Russell & Norvig:
 
@@ -100,17 +100,135 @@ Classificação do ambiente do Almoxarifado, conforme Russell & Norvig:
 
 ---
 
-## 4) Programa de Agente (onde a busca acontece)
+## 4) Arquitetura: Ambiente – Agente – Programa de Agente
 
-O algoritmo de busca **não é chamado isoladamente**: ele faz parte do ciclo deliberativo do agente.
+A implementação respeita explicitamente a separação arquitetural exigida pelo AIMA, com cada componente em um módulo distinto e com responsabilidades bem definidas.
 
-- **Ambiente Simulado (Environment):** O projeto utiliza a arquitetura base do AIMA para gerir o ciclo de perceção e ação. A classe `AmbienteAlmoxarifado` gere as regras físicas do mapa (limites e prateleiras). Isso foi escolhido porque separa a "física" do mundo do "cérebro" do robô, cumprindo o requisito estrutural da disciplina.
-- **Agente Baseado em Modelos (Model-Based Agent):** O agente mantém um estado interno do mundo que não consegue ver num único relance. O `AgenteAlmoxarifado` guarda o mapa das prateleiras na variável `memoria_prateleiras`. Isso é essencial porque, num almoxarifado, o robô precisa de lembrar onde estão as caixas sem ter de explorar o mapa às cegas a cada turno.
-- **Agente Baseado em Objetivos (Goal-Based Agent):** O robô não reage apenas a estímulos imediatos; ele projeta o futuro para atingir um alvo (sub-objetivo). O programa decide dinamicamente o seu objetivo: se está vazio, o objetivo é uma prateleira; se tem uma caixa, o objetivo é o balcão.
+### Ambiente (`AmbienteAlmoxarifado` — `env/ambiente_almoxarifado.py`)
+
+O Ambiente é responsável por:
+- **Manter o estado do mundo**: dicionário de prateleiras, posição de cada agente, quantidade de itens entregues.
+- **Fornecer percepções**: método `percept(agent)` retorna a percepção atual do agente.
+- **Executar ações**: método `execute_action(agent, action)` aplica a ação física no mundo (movimento, coleta, entrega).
+- **Render**: método `render()` imprime o estado visual do mundo a cada passo.
+
+**Exemplo de ciclo no Ambiente:**
+```python
+# A classe Environment do AIMA chama este ciclo:
+def step(self):
+    super().step()  # Chama agent_program para cada agente
+    self.render()   # Mostra novo estado
+```
+
+### Agente (`AgenteAlmoxarifado` — `agents/agente_almoxarifado.py`)
+
+O Agente é a entidade **inserida no ambiente**:
+- Mantém memória do mapa de prateleiras (`memoria_prateleiras`).
+- Possui um **programa de agente** (função `programa_agente`) que é chamado a cada passo.
+- Acumula um **plano** (sequência de ações gerada pelo A*) na variável `self.plano`.
+
+**Ciclo de vida:**
+```python
+class AgenteAlmoxarifado(Agent):
+    def __init__(self, pos_inicial, dados_prateleiras, ...):
+        super().__init__(self.programa_agente)  # Registra o programa
+        self.memoria_prateleiras = dados_prateleiras
+        self.plano = []  # Plano de ações gerado pela busca
+    
+    def programa_agente(self, percepcao):
+        # Função que decide ações a partir de percepções
+        # (detalhado em 4.3)
+```
+
+### Programa de Agente (dentro de `programa_agente` — `agents/agente_almoxarifado.py`)
+
+Este é o **núcleo do projeto**, onde a separação conceitual é mais crítica.
+
+O programa de agente é uma **função que:**
+
+#### 1️⃣ Recebe Percepções do Ambiente
+```python
+def programa_agente(self, percepcao):
+    pos_atual = percepcao['posicao']
+    tem_caixa = percepcao['tem_caixa']
+    # A percepção fornece o que o agente "vê" no mundo
+```
+
+#### 2️⃣ Decide Quando Formular um Problema
+```python
+# Se tem um plano na memória, executa o próximo passo
+if self.plano:
+    return self.plano.pop(0)
+
+# Se não tem plano, cria um novo subproblema
+if tem_caixa:
+    alvo = self.pos_entrega  # Sub-objetivo: balcão
+else:
+    # Escolhe a prateleira com item mais próxima
+    prateleiras_disponiveis = [...]
+    alvo = prateleiras_disponiveis[0]
+```
+
+#### 3️⃣ Executa Algoritmo de Busca para Gerar Plano
+```python
+# Formula o subproblema (instância de ProblemaAlmoxarifado)
+obstaculos = set(self.memoria_prateleiras.keys()) - {alvo}
+prob = ProblemaAlmoxarifado(
+    (pos_atual[0], pos_atual[1], status_caixa),
+    obstaculos,
+    alvo,
+    self.pos_entrega,
+    self.largura_grid,
+    self.altura_grid
+)
+
+# ⚠️ AQUI: Chama A* para gerar o plano (sequência de ações)
+no_solucao = astar_search(prob)
+
+if no_solucao:
+    self.plano = no_solucao.solution()  # Lista de ações
+    self.plano.append('Pegar')  # Ou 'Entregar' conforme o contexto
+```
+
+#### 4️⃣ Retorna Uma Ação por Passo
+```python
+# A cada chamada do programa, retorna apenas UMA ação
+return self.plano.pop(0) if self.plano else 'NoOp'
+```
+
+### Relação com `SimpleProblemSolvingAgentProgram` (AIMA)
+
+O `programa_agente` implementa o **conceito central** de `SimpleProblemSolvingAgentProgram`:
+
+| Etapa AIMA | Implementação no Projeto |
+|-----------|-------------------------|
+| Formulate Goal | Dinâmico: `alvo = self.pos_entrega` ou `alvo = prateleira_mais_prox` |
+| Formulate Problem | `ProblemaAlmoxarifado(estado_inicial, obstáculos, alvo, ...)` |
+| Search | `astar_search(prob)` retorna nó-solução com caminho |
+| Extract Plan | `no_solucao.solution()` extrai sequência de ações |
+| Execute One Step | `return self.plano.pop(0)` retorna 1 ação; Ambiente executa |
+
+### Fluxo Completo de Uma Interação
+
+```
+[ AMBIENTE ]
+    ↓ (percept)
+[ PROGRAMA DE AGENTE ]
+    ↓ (se sem plano, cria subproblema)
+[ A* SEARCH ]
+    ↓ (retorna solução: nó com .solution())
+[ PROGRAMA DE AGENTE ]
+    ↓ (extrai plano e retorna 1 ação)
+[ AMBIENTE ]
+    ↓ (execute_action aplica ação física no mundo)
+[ render() mostra o novo estado ]
+```
+
+Este ciclo se repete até o ambiente estar completo (`is_done()`).
 
 ---
 
-## 📂 Estrutura do Projeto
+##  Estrutura do Projeto
 
 O código foi rigorosamente organizado para respeitar a arquitetura exigida:
 
@@ -128,7 +246,15 @@ O código foi rigorosamente organizado para respeitar a arquitetura exigida:
 ├── main.py                 # Script de execução em modo Terminal/Texto
 ├── interface.py            # Script de execução em modo Interface Gráfica
 └── README.md
+```
 
+---
+
+## Como Usar / Getting Started
+
+### 1. Clonar e Preparar o Ambiente
+
+```bash
 git clone [https://github.com/Hernandison/IA-Grupo-07.git](https://github.com/Hernandison/IA-Grupo-07.git)
 cd IA-Grupo-07
 
@@ -141,21 +267,60 @@ python3 -m venv venv
 source venv/bin/activate
 
 pip install -r requirements.txt
+```
 
+### 2. Executar o Agente
 
-#MODO TERMINAL:
+#### 🖥️ Modo Terminal (Texto)
+Vê o agente em ação com render `render()` imprimindo a grade a cada passo. Útil para **debug** e **avaliação** do algoritmo.
 
+```bash
 python main.py
+```
 
+Você verá algo como:
+```
+===========================================================
+   PROJETO GRUPO 07: AGENTE INTELIGENTE DE ALMOXARIFADO
+===========================================================
 
-#MODO INTERFACE:
+-> Mapa: 10x10
+-> Agente Inicia em: (0, 0)
+-> Zona de Entrega:  (0, 9)
+-> Prateleiras/Obstáculos: 14 blocos registrados
+------------------------------------------------------------
+Iniciando simulação do agente...
 
+===================================
+ ESTADO ATUAL DO ALMOXARIFADO
+===================================
+ 🤖  .    .    .    .     .      .      .      . [1].    
+ ...
+```
+
+#### 🎮 Modo Interface Gráfica (Retro/16-bit)
+Editor visual para criar cenários personalizados e visualizar o agente navegando em tempo real.
+
+```bash
 python interface.py
+```
 
+### 3. Rodar Testes Automatizados
 
-#TESTES PYTESTS:
+Valida a **modelagem formal** do problema (estados, ações, transições, heurística):
 
-pytest -v
+```bash
+pytest tests/teste_almoxarifado.py -v
+```
 
-# (alternativa equivalente)
-# pytest tests/teste_almoxarifado.py -v
+Resultados esperados:
+```
+tests/teste_almoxarifado.py::test_restricoes_movimento PASSED
+tests/teste_almoxarifado.py::test_logica_pegar PASSED
+tests/teste_almoxarifado.py::test_admissibilidade_heuristica PASSED
+tests/teste_almoxarifado.py::test_solucao_missao_completa PASSED
+tests/teste_almoxarifado.py::test_execucao_ambiente PASSED
+tests/teste_almoxarifado.py::test_deliberacao_agente PASSED
+
+====== 6 passed in 0.76s ======
+```
