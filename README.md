@@ -6,17 +6,23 @@
 
 ---
 
-## 1) Descrição do Projeto
+## 1) Objetivo do Projeto
 
-Este projeto implementa um **Agente Racional Baseado em Objetivos** aplicado à logística de um almoxarifado automatizado.
+Implementar um **agente inteligente baseado em busca** para resolver um problema **original** proposto pelo grupo (logistica de um almoxarifado automatizado), usando os conceitos do AIMA e as classes base do repositório `aima-python`.
+
+O objetivo inclui, explicitamente:
+- **Arquitetura Ambiente – Agente – Programa de Agente** bem definida e separada;
+- **Uso de busca dentro do programa do agente** (nao como chamada isolada);
+- **Modelagem formal do problema** com `Problem`, `Environment` e `Agent` do AIMA;
+- **Justificativas** das decisoes de modelagem, dos algoritmos escolhidos e das limitacoes.
 
 O problema foi modelado como um **ambiente de grade (Grid World)**, no qual o agente deve planejar rotas inteligentes para:
 
-- Navegar através de obstáculos (prateleiras/paredes);
-- Localizar e coletar itens distribuídos no armazém;
-- Transportar os itens até a zona de entrega (Balcão).
+- Navegar atraves de obstaculos (prateleiras/paredes);
+- Localizar e coletar itens distribuidos no armazem;
+- Transportar os itens ate a zona de entrega (Balcao).
 
-A solução utiliza a arquitetura **Ambiente – Agente – Programa de Agente** e aplica o algoritmo de busca **A\*** (A-Star), inspirado na abordagem de Russell & Norvig (AIMA), para encontrar o caminho mais curto até os objetivos.
+A solucao utiliza a arquitetura **Ambiente – Agente – Programa de Agente** e aplica o algoritmo de busca **A\\*** (A-Star), conforme Russell & Norvig (AIMA), para encontrar o caminho mais curto ate os objetivos.
 
 ---
 
@@ -30,24 +36,7 @@ A solução utiliza a arquitetura **Ambiente – Agente – Programa de Agente**
 
 ---
 
-## 🧠 Arquitetura e Algoritmos do AIMA
-
-Para cumprir os requisitos da disciplina, o projeto foi construído herdando as classes base do repositório `aima-python`.
-
-### ✅ Classes e Algoritmos Utilizados
-* **`Environment`** (de `aima.agents`): Utilizado como base para a classe `AmbienteAlmoxarifado`. Mantém o estado do mundo, as posições das prateleiras, do balcão e gerencia a física do robô.
-* **`Agent`** (de `aima.agents`): Base para a classe `AgenteAlmoxarifado`. Mantém o ciclo de receber percepções e retornar ações através do método genérico `agent_program`.
-* **`Problem`** (de `aima.search`): Base para a classe `ProblemaAlmoxarifado`. Formaliza a representação dos estados, modelo de transição, conjunto de ações e teste de objetivo.
-* **`astar_search`** (Busca A*): O algoritmo principal utilizado no programa do agente. Foi escolhido pois o problema de navegação em grade exige uma solução **ótima e completa**. Como conhecemos as coordenadas do agente e do alvo, a heurística de Manhattan garante que o A* expanda o menor número possível de nós para encontrar o caminho mais curto, contornando prateleiras de forma inteligente.
-
-### ❌ Algoritmos Não Utilizados (e porquê)
-* **Buscas Cegas (BFS, DFS, Custo Uniforme):** Foram descartadas porque não utilizam informação do estado objetivo (heurística). Num ambiente de grade (*Grid World*), a BFS expandiria nós radialmente em todas as direções, sendo muito ineficiente. A DFS não garante o caminho mais curto (não é ótima).
-* **Greedy Best-First Search (Busca Gulosa):** Embora rápida, não foi utilizada no pathfinding porque não é ótima e não é completa (pode ficar presa em obstáculos em formato de "U", comuns em layouts de prateleiras).
-* **Buscas Locais (Hill Climbing, Simulated Annealing):** Descartadas por não serem adequadas para problemas clássicos de navegação labiríntica, visto que o agente ficaria facilmente preso em máximos locais (encurralado atrás de uma prateleira).
-
----
-
-## 2) Especificação Formal do Problema (AIMA) + Mapeamento no Código
+## 2) Especificação Formal do Problema (AIMA) + Mapeamento no Código (AIMA) + Mapeamento no Código
 
 O problema é resolvido como uma sequência de **subproblemas de navegação em grade** (ir até uma prateleira com item; depois ir até o balcão). Cada subproblema é modelado como uma instância de `ProblemaAlmoxarifado`.
 
