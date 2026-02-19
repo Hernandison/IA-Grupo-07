@@ -22,7 +22,7 @@ O problema foi modelado como um **ambiente de grade (Grid World)**, no qual o ag
 - Localizar e coletar itens distribuídos no armazém;
 - Transportar os itens até a zona de entrega (Balcão).
 
-A solução utiliza a arquitetura **Ambiente – Agente – Programa de Agente** e aplica o algoritmo de busca **A\\*** (A-Star), conforme Russell & Norvig (AIMA), para encontrar o caminho mais curto até os objetivos.
+A solução utiliza a arquitetura **Ambiente – Agente – Programa de Agente** e aplica o algoritmo de busca **A\*** (A-Star), conforme Russell & Norvig (AIMA), para encontrar o caminho mais curto até os objetivos.
 
 ---
 
