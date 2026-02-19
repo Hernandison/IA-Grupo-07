@@ -5,7 +5,9 @@ from aima.search import Problem
 class ProblemaAlmoxarifado(Problem):
     def __init__(self, estado_inicial, obstaculos, alvo, pos_entrega, largura=10, altura=10):
         # Herdando do AIMA
-        super().__init__(estado_inicial, goal=None)
+        # Por padrão, o objetivo (goal) do subproblema de navegação é chegar na coordenada do alvo.
+        # O programa do agente muda o alvo (prateleira/balcão) criando uma nova instância do problema.
+        super().__init__(estado_inicial, goal=alvo)
         self.obstaculos = obstaculos # Posições que bloqueiam (ex: outras prateleiras)
         self.alvo = alvo             # Onde queremos chegar (Prateleira ou Balcão)
         self.pos_entrega = pos_entrega
@@ -48,12 +50,8 @@ class ProblemaAlmoxarifado(Problem):
         return (x, y, status)
 
     def goal_test(self, state):
-        """
-        O objetivo principal é gerido pelo Programa do Agente.
-        O A* busca apenas o caminho; retornamos False aqui pois
-        injetamos uma função anônima (lambda) na hora de instanciar.
-        """
-        return False 
+        """Retorna True quando o agente chega na coordenada objetivo do subproblema."""
+        return state[0:2] == self.goal
 
     def h(self, node):
         """Heurística simples: Distância Manhattan até o alvo atual."""

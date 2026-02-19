@@ -37,7 +37,6 @@ class AgenteAlmoxarifado(Agent):
             # 1. Sub-objetivo: Levar caixa ao balcão
             obstaculos = set(self.memoria_prateleiras.keys())
             prob = ProblemaAlmoxarifado((pos_atual[0], pos_atual[1], 1), obstaculos, self.pos_entrega, self.pos_entrega, self.largura_grid, self.altura_grid)
-            prob.goal_test = lambda state: state[0:2] == self.pos_entrega
             
             # Executa a busca A* para encontrar a melhor rota até o ponto de entrega
             no_solucao = astar_search(prob)
@@ -62,7 +61,6 @@ class AgenteAlmoxarifado(Agent):
             obstaculos = set(self.memoria_prateleiras.keys()) - {alvo}
             
             prob = ProblemaAlmoxarifado((pos_atual[0], pos_atual[1], 0), obstaculos, alvo, self.pos_entrega, self.largura_grid, self.altura_grid)
-            prob.goal_test = lambda state: state[0:2] == alvo
             
             # Executa a busca A* para encontrar a melhor rota até a prateleira escolhida
             no_solucao = astar_search(prob)

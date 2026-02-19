@@ -95,8 +95,6 @@ def test_solucao_missao_completa(setup_padrao):
     # Estado: (0,0) sem caixa. Alvo: (2,2)
     estado_inicial = (0, 0, 0)
     problema = ProblemaAlmoxarifado(estado_inicial, obstaculos, alvo, pos_entrega)
-    # Injeta a condição de paragem igual à feita pelo agente
-    problema.goal_test = lambda state: state[0:2] == alvo
     
     solucao = astar_search(problema)
     
