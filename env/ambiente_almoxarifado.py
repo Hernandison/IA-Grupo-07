@@ -33,9 +33,13 @@ class AmbienteAlmoxarifado(Environment):
         if action in movimentos:
             dx, dy = movimentos[action]
             nx, ny = x + dx, y + dy
-            # Checagem básica de colisão
+            # Checagem básica de limites + colisão com obstáculos físicos
             if 0 <= nx < self.largura and 0 <= ny < self.altura:
-                dados['posicao'] = (nx, ny)
+                destino = (nx, ny)
+                # Prateleiras com 0 itens funcionam como paredes/obstáculos
+                if destino in self.prateleiras and self.prateleiras[destino] == 0:
+                    return
+                dados['posicao'] = destino
 
         elif action == 'Pegar':
             if dados['posicao'] in self.prateleiras and self.prateleiras[dados['posicao']] > 0 and not dados['tem_caixa']:
