@@ -1,6 +1,6 @@
 # ====================================================================================
 # ALMOXARIFADO MANAGER 3D: SURVIVAL LOGISTICS
-# Motor 3D Isométrico, Partículas, Radar, Leaderboard, Invasões, Menu Pausa e Monitor Terminal.
+# Motor 3D Isométrico Responsivo (Ultrawide Ready), Radar, Leaderboard, e IA (A*).
 # ====================================================================================
 
 import tkinter as tk
@@ -31,12 +31,10 @@ from aima.search import astar_search
 C = {
     'bg_void':   '#020205', 'bg':        '#050814', 'bg_panel':  '#0a0f1c',
     'grid':      '#1e293b', 'border':    '#1e3a8a', 'border_hl': '#3b82f6',
-    
     'cyan':      '#00f0ff', 'cyan_dim':  '#0088aa', 'blue':      '#1d4ed8',
     'green':     '#10b981', 'green_dim': '#065f46', 'yellow':    '#facc15',
     'orange':    '#f97316', 'red':       '#ef4444', 'red_dim':   '#7f1d1d',
     'white':     '#f8fafc', 'gray':      '#64748b', 'gray_dark': '#334155',
-    
     'floor_a':   '#0b1120', 'floor_b':   '#0f172a', 'stripe_1':  '#eab308', 'stripe_2': '#000000',
     
     # Cores 3D (Frente, Topo, Lado)
@@ -53,7 +51,6 @@ C = {
     'pele':      '#fcd34d', 'pele_esc':  '#b45309'
 }
 
-# Fontes ajustadas para telas menores
 F = {
     'giant':  ('Courier New', 36, 'bold'), 'title':  ('Courier New', 22, 'bold'),
     'score':  ('Courier New', 18, 'bold'), 'hud':    ('Courier New', 12, 'bold'),
@@ -84,10 +81,9 @@ class AudioEngine:
         if os.path.exists(caminho_musica):
             pygame.mixer.music.load(caminho_musica)
             pygame.mixer.music.set_volume(self.volume_atual)
-            pygame.mixer.music.play(-1) # Loop infinito
-            print("[SISTEMA] Música de fundo carregada com sucesso.")
+            pygame.mixer.music.play(-1)
         else:
-            print(f"[SISTEMA] Música não encontrada em: {caminho_musica}. Crie a pasta e coloque o arquivo.")
+            print(f"[SISTEMA] Música não encontrada em: {caminho_musica}.")
 
     def set_volume(self, volume):
         self.volume_atual = max(0.0, min(1.0, volume))
@@ -100,21 +96,17 @@ class AudioEngine:
         sr = 44100
         n = int(sr * dur)
         t = np.linspace(0, dur, n, endpoint=False)
-        
         if sweep_to:
             f = np.linspace(freqs[0], sweep_to, n)
             wave = np.sin(2 * np.pi * np.cumsum(f) / sr)
         else:
             wave = sum(np.sin(2 * np.pi * freq * t) for freq in freqs) / len(freqs)
-            
         if tipo == 'square': wave = np.sign(wave)
         elif tipo == 'noise': wave = np.random.uniform(-1, 1, n)
-
         fade = min(int(sr * 0.05), n)
         if fade > 0: 
             wave[:fade] *= np.linspace(0, 1, fade)
             wave[-fade:] *= np.linspace(1, 0, fade)
-            
         s = (wave * vol * 32767).astype(np.int16)
         som = pygame.sndarray.make_sound(np.column_stack((s, s)))
         som.set_volume(self.volume_atual)
@@ -139,14 +131,10 @@ def carregar_leaderboard():
         try:
             with open(LEADERBOARD_FILE, 'r') as f: return json.load(f)
         except: pass
-    return [
-        {"nome": "HERNANDI", "score": 15000, "entregas": 50},
-        {"nome": "ALAN_TUR", "score": 10000, "entregas": 35},
-        {"nome": "ROB_COP",  "score": 5000,  "entregas": 15}
-    ]
+    return [{"nome": "HERNANDI", "score": 15000, "entregas": 50}]
 
 def salvar_leaderboard(dados):
-    dados_sorted = sorted(dados, key=lambda x: x['score'], reverse=True)[:8]
+    dados_sorted = sorted(dados, key=lambda x: x['score'], reverse=True)[:50]
     try:
         with open(LEADERBOARD_FILE, 'w') as f: json.dump(dados_sorted, f)
     except: pass
@@ -162,32 +150,26 @@ class Funcionario:
         self.estado = 'esperando' 
         self.tremor = 0
         self.offset_y = 60 
-        
         r = random.randint(1, 3)
         self.c_f = C[f'roupa_{r}_f']
         self.c_t = C[f'roupa_{r}_t']
         self.c_s = C[f'roupa_{r}_s']
 
     def atualizar(self):
-        if self.offset_y > 0:
-            self.offset_y = max(0, self.offset_y - 4)
-            
+        if self.offset_y > 0: self.offset_y = max(0, self.offset_y - 4)
         if self.estado == 'esperando':
             self.paciencia -= 1.0
             pct = self.paciencia / self.paciencia_max
-            if pct < 0.25: self.tremor = random.choice([-2, 0, 2])
-            else: self.tremor = 0
+            self.tremor = random.choice([-2, 0, 2]) if pct < 0.25 else 0
 
 class Invasor:
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
+        self.x, self.y = x, y
 
 class Particula:
     def __init__(self, x, y, cor, vel_x, vel_y):
-        self.x, self.y = x, y
+        self.x, self.y, self.cor = x, y, cor
         self.vx, self.vy = vel_x, vel_y
-        self.cor = cor
         self.vida = 1.0
         self.tamanho = random.randint(3, 7)
 
@@ -207,20 +189,32 @@ class TextoFlutuante:
         self.vida -= 0.02
         return self.vida > 0
 
-# ─── MOTOR PRINCIPAL (MÁQUINA DE ESTADOS E RENDER 3D) ───────────────────────────────
+# ─── MOTOR PRINCIPAL (MÁQUINA DE ESTADOS E RENDER 3D RESPONSIVO) ────────────────────
 class AlmoxarifadoManager3D:
     GRID_W, GRID_H = 14, 11
-    SZ = 42       # Reduzido de 56 para caber em telas pequenas
-    DEPTH = 12    # Proporcionalmente ajustado
 
     def __init__(self, root):
         self.root = root
         self.root.title('ALMOXARIFADO MANAGER 3D: SURVIVAL LOGISTICS')
         self.root.configure(bg=C['bg_void'])
-        self.root.resizable(False, False)
         
+        # Geometria Inicial Dinâmica e Limites
+        self.root.geometry("1100x750")
+        self.root.minsize(800, 500)
+        self.root.resizable(True, True)
+        
+        # Tenta maximizar a janela nativamente
+        try: self.root.state('zoomed')
+        except: pass
+        
+        self.SZ = 42       
+        self.DEPTH = 12    
+        self.offset_x = 0
+        self.offset_y = 0
+
         self.audio = AudioEngine()
         self.leaderboard = carregar_leaderboard()
+        self.pagina_leaderboard = 0 
         self.estado_jogo = 'MENU' 
         
         self.tick = 0
@@ -234,24 +228,17 @@ class AlmoxarifadoManager3D:
         self._loop_mestre()
         
         sys.stdout.write('\033[2J\033[H')
-        print(f"\033[96m[SISTEMA] Motor 3D Iniciado. Aguardando Jogador...\033[0m")
+        print(f"\033[96m[SISTEMA] Motor 3D Iniciado (Modo Responsivo). Aguardando Jogador...\033[0m")
 
     def _montar_janela(self):
-        w_canvas = self.GRID_W * self.SZ + self.DEPTH
-        h_canvas = self.GRID_H * self.SZ + self.DEPTH
-        w_painel = 280
         h_hud = 60
         
-        self.root.geometry(f"{w_canvas + w_painel + 30}x{h_canvas + h_hud + 40}")
-        
-        # Frame Superior: Contém HUD e Volume
         self.top_frame = tk.Frame(self.root, bg=C['bg_panel'], height=h_hud)
         self.top_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(10, 0))
         
         self.hud = tk.Canvas(self.top_frame, height=h_hud, bg=C['bg_panel'], highlightthickness=0)
         self.hud.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
 
-        # Controle de Volume
         self.frame_vol = tk.Frame(self.top_frame, bg=C['bg_panel'])
         self.frame_vol.pack(side=tk.RIGHT, padx=10)
         
@@ -259,18 +246,19 @@ class AlmoxarifadoManager3D:
         self.vol_slider = tk.Scale(self.frame_vol, from_=0, to=100, orient=tk.HORIZONTAL, 
                                    bg=C['bg_panel'], fg=C['white'], highlightthickness=0,
                                    command=self._ajustar_volume, length=100, showvalue=0)
-        self.vol_slider.set(20) # Começa com 20%
+        self.vol_slider.set(20) 
         self.vol_slider.pack()
 
-        # Frame Principal: Canvas 3D e Painel Lateral
         self.frame_main = tk.Frame(self.root, bg=C['bg_void'])
         self.frame_main.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
         
-        self.canvas = tk.Canvas(self.frame_main, width=w_canvas, height=h_canvas, bg=C['bg'], highlightthickness=2, highlightbackground=C['border'])
-        self.canvas.pack(side=tk.LEFT)
+        # Panel assume tamanho fixo na largura e expande na altura
+        self.painel = tk.Canvas(self.frame_main, width=300, bg=C['bg_panel'], highlightthickness=2, highlightbackground=C['border'])
+        self.painel.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.painel = tk.Canvas(self.frame_main, width=w_painel, height=h_canvas, bg=C['bg_panel'], highlightthickness=2, highlightbackground=C['border'])
-        self.painel.pack(side=tk.RIGHT)
+        # Canvas principal preenche todo o espaço restante
+        self.canvas = tk.Canvas(self.frame_main, bg=C['bg'], highlightthickness=2, highlightbackground=C['border'])
+        self.canvas.pack(side=tk.LEFT, expand=True, fill=tk.BOTH)
 
     def _ajustar_volume(self, val):
         self.audio.set_volume(int(val) / 100.0)
@@ -280,21 +268,46 @@ class AlmoxarifadoManager3D:
         self.root.bind('<Escape>', self._toggle_pause)
         self.root.bind('<p>', self._toggle_pause)
         self.root.bind('<P>', self._toggle_pause)
+        self.root.bind('<Left>', self._handle_esq)
+        self.root.bind('<Right>', self._handle_dir)
+        self.canvas.bind('<Configure>', self._on_resize) # Evento Responsivo
         self.canvas.bind('<Button-1>', self._handle_click)
 
-    def _gerar_particulas(self, x, y, cor, qtd):
-        for _ in range(qtd):
-            vx = random.uniform(-3, 3)
-            vy = random.uniform(-5, -1)
-            self.particulas.append(Particula(x + self.SZ//2, y + self.SZ//2, cor, vx, vy))
+    # ── EVENTO RESPONSIVO: RECALCULA PROPORÇÕES AO REDIMENSIONAR TELA ───────────────
+    def _on_resize(self, event):
+        w, h = event.width, event.height
+        if w < 100 or h < 100: return
+        
+        # Calcula qual é o maior tamanho de célula (SZ) que cabe na tela mantendo proporção
+        sz_w = w / (self.GRID_W + 1)
+        sz_h = h / (self.GRID_H + 1)
+        self.SZ = max(20, int(min(sz_w, sz_h)))
+        self.DEPTH = max(4, int(self.SZ * 0.28))
+        
+        # Calcula margens para centralizar o ambiente na tela
+        self.offset_x = (w - (self.GRID_W * self.SZ)) // 2
+        self.offset_y = (h - (self.GRID_H * self.SZ)) // 2
 
     # ── GERENCIADOR DE ESTADOS E EVENTOS DE TECLADO ───────────────────────────────────
+    def _handle_esq(self, e):
+        if self.estado_jogo == 'MENU' and self.pagina_leaderboard > 0:
+            self.audio.play('menu_blip')
+            self.pagina_leaderboard -= 1
+
+    def _handle_dir(self, e):
+        if self.estado_jogo == 'MENU':
+            max_pag = max(0, (len(self.leaderboard) - 1) // 5)
+            if self.pagina_leaderboard < max_pag:
+                self.audio.play('menu_blip')
+                self.pagina_leaderboard += 1
+
     def _handle_space(self, e):
         if self.estado_jogo in ['MENU', 'GAMEOVER']:
             self.audio.play('menu_blip')
             nome = simpledialog.askstring('NOVO JOGO', 'Código do Gestor (Máx 8):')
             if nome and nome.strip():
                 self.nome_jogador = nome.strip()[:8].upper()
+                self.pagina_leaderboard = 0 
                 self._iniciar_partida()
 
     def _toggle_pause(self, e=None):
@@ -343,6 +356,12 @@ class AlmoxarifadoManager3D:
         self.leaderboard.append({'nome': self.nome_jogador, 'score': self.score, 'entregas': self.entregas})
         self.leaderboard = salvar_leaderboard(self.leaderboard)
 
+    def _gerar_particulas(self, abs_x, abs_y, cor, qtd):
+        for _ in range(qtd):
+            vx = random.uniform(-3, 3)
+            vy = random.uniform(-5, -1)
+            self.particulas.append(Particula(abs_x, abs_y, cor, vx, vy))
+
     # ── LOOP MESTRE E LÓGICA DO JOGO ──────────────────────────────────────────────────
     def _loop_mestre(self):
         self.tick += 1
@@ -377,8 +396,10 @@ class AlmoxarifadoManager3D:
             if f.paciencia <= 0:
                 self.audio.play('angry')
                 self.reputacao -= 12
-                self._gerar_particulas(f.pos_grid[0]*self.SZ, f.pos_grid[1]*self.SZ, C['red'], 15)
-                self.textos.append(TextoFlutuante(f.pos_grid[0]*self.SZ, (f.pos_grid[1]-1)*self.SZ, 'INVASÃO!!', C['red']))
+                # Partículas em posições absolutas baseadas no Offset Responsivo
+                px, py = self.offset_x + f.pos_grid[0]*self.SZ + self.SZ//2, self.offset_y + f.pos_grid[1]*self.SZ
+                self._gerar_particulas(px, py, C['red'], 15)
+                self.textos.append(TextoFlutuante(px - self.SZ//2, py - self.SZ, 'INVASÃO!!', C['red']))
                 self.invasores.append(Invasor(f.pos_grid[0], f.pos_grid[1] - 1))
                 
                 self.funcionarios_fila.remove(f)
@@ -395,14 +416,14 @@ class AlmoxarifadoManager3D:
                 for dx, dy in [(0,1), (0,-1), (1,0), (-1,0)]:
                     nx, ny = inv.x + dx, inv.y + dy
                     if 0 <= nx < self.GRID_W and 0 <= ny < self.GRID_H - 1:
-                        if (nx, ny) not in self.prateleiras:
-                            candidatos.append((nx, ny))
+                        if (nx, ny) not in self.prateleiras: candidatos.append((nx, ny))
                 if candidatos:
                     candidatos.sort(key=lambda p: abs(p[0]-rx) + abs(p[1]-ry))
                     inv.x, inv.y = candidatos[0] if random.random() < 0.6 else random.choice(candidatos)
 
         if any(inv.x == rx and inv.y == ry for inv in self.invasores):
-            self._gerar_particulas(rx*self.SZ, ry*self.SZ, C['red'], 50)
+            px, py = self.offset_x + rx*self.SZ + self.SZ//2, self.offset_y + ry*self.SZ
+            self._gerar_particulas(px, py, C['red'], 50)
             self._disparar_gameover("DESTRUÍDO PELOS INVASORES!")
             return
 
@@ -411,10 +432,8 @@ class AlmoxarifadoManager3D:
         for dx, dy in [(0,1), (0,-1), (1,0), (-1,0)]:
             nx, ny = rx+dx, ry+dy
             if 0 <= nx < self.GRID_W and 0 <= ny < self.GRID_H:
-                if any(inv.x == nx and inv.y == ny for inv in self.invasores):
-                    tem_inimigo = True
-                elif (nx, ny) not in self.prateleiras:
-                    caminhos += 1
+                if any(inv.x == nx and inv.y == ny for inv in self.invasores): tem_inimigo = True
+                elif (nx, ny) not in self.prateleiras: caminhos += 1
         
         if caminhos == 0 and tem_inimigo:
             self._disparar_gameover("ROBÔ ENCURRALADO!")
@@ -429,8 +448,7 @@ class AlmoxarifadoManager3D:
 
         if self.tick % 2 == 0:
             memoria = self.ambiente.prateleiras.copy()
-            for inv in self.invasores:
-                memoria[(inv.x, inv.y)] = 0 
+            for inv in self.invasores: memoria[(inv.x, inv.y)] = 0 
             self.agente.memoria_prateleiras = memoria
 
             antes = dados_robo['itens_entregues']
@@ -449,27 +467,21 @@ class AlmoxarifadoManager3D:
                     obstaculos = set(self.ambiente.prateleiras.keys())
                     for inv in self.invasores: obstaculos.add((inv.x, inv.y))
                     
-                    prob = ProblemaAlmoxarifado(
-                        (dados_robo['posicao'][0], dados_robo['posicao'][1], 0),
-                        obstaculos, self.pos_robo_inicial, self.pos_robo_inicial,
-                        self.GRID_W, self.GRID_H
-                    )
+                    prob = ProblemaAlmoxarifado((dados_robo['posicao'][0], dados_robo['posicao'][1], 0),
+                        obstaculos, self.pos_robo_inicial, self.pos_robo_inicial, self.GRID_W, self.GRID_H)
                     prob.goal_test = lambda state: state[0:2] == self.pos_robo_inicial
                     sol = astar_search(prob)
-                    if sol:
-                        self.agente.plano = sol.solution()
+                    if sol: self.agente.plano = sol.solution()
                         
                 if self.agente.plano:
                     pos_antes = dados_robo['posicao']
                     acao = self.agente.plano.pop(0)
                     self.ambiente.execute_action(self.agente, acao)
-                    pos_depois = self.ambiente.dados_agentes[self.agente]['posicao']
-                    if pos_antes != pos_depois:
+                    if pos_antes != self.ambiente.dados_agentes[self.agente]['posicao']:
                         moveu_agora = True
                         if random.random() < 0.3: self.audio.play('step')
 
-            if moveu_agora or (self.tick % 20 == 0):
-                self._imprimir_matriz_terminal()
+            if moveu_agora or (self.tick % 20 == 0): self._imprimir_matriz_terminal()
 
             if self.ambiente.dados_agentes[self.agente]['itens_entregues'] > antes:
                 self.audio.play('delivery')
@@ -478,16 +490,14 @@ class AlmoxarifadoManager3D:
                 self.score += pts
                 self.reputacao = min(100, self.reputacao + 5)
                 
-                px, py = dados_robo['posicao']
-                self._gerar_particulas(px*self.SZ, py*self.SZ, C['green'], 20)
-                self.textos.append(TextoFlutuante(px*self.SZ, py*self.SZ, f'+{pts} PTS', C['green']))
+                gx, gy = dados_robo['posicao']
+                px, py = self.offset_x + gx*self.SZ + self.SZ//2, self.offset_y + gy*self.SZ
+                self._gerar_particulas(px, py, C['green'], 20)
+                self.textos.append(TextoFlutuante(px, py, f'+{pts} PTS', C['green']))
                 
-                if self.funcionario_alvo in self.funcionarios_fila:
-                    self.funcionarios_fila.remove(self.funcionario_alvo)
+                if self.funcionario_alvo in self.funcionarios_fila: self.funcionarios_fila.remove(self.funcionario_alvo)
                 self.funcionario_alvo = None
-                self._imprimir_matriz_terminal() 
 
-    # ── IMPRESSÃO DO MAPA NO TERMINAL (LOG TÁTICO) ───────────────────────────────────
     def _imprimir_matriz_terminal(self):
         sys.stdout.write('\033[H') 
         C_CY = '\033[96m'; C_RE = '\033[91m'; C_GR = '\033[92m'; C_YE = '\033[93m'
@@ -519,7 +529,7 @@ class AlmoxarifadoManager3D:
             print(" ".join(linha))
         print("-" * 50 + " " * 10 + "\n")
 
-    # ── TRATAMENTO DE CLIQUES ────────────────────────────────────────────────────────
+    # ── TRATAMENTO DE CLIQUES COM COMPENSAÇÃO RESPONSIVA ─────────────────────────────
     def _handle_click(self, e):
         if self.estado_jogo == 'PAUSE':
             for acao, (x1, y1, x2, y2) in self.botoes_pause.items():
@@ -528,6 +538,7 @@ class AlmoxarifadoManager3D:
                     if acao == 'CONTINUAR': self._toggle_pause()
                     elif acao == 'MENU':
                         sys.stdout.write('\033[2J\033[H')
+                        self.pagina_leaderboard = 0
                         self.estado_jogo = 'MENU'
                     elif acao == 'SAIR':
                         self.root.quit()
@@ -535,8 +546,9 @@ class AlmoxarifadoManager3D:
 
         if self.estado_jogo != 'JOGO': return
         
-        cx = int((e.x - (self.GRID_H * self.SZ - e.y) * 0.1) // self.SZ)
-        cy = int(e.y // self.SZ)
+        # Converte clique absoluto para célula da Grid considerando os Offsets Adaptativos
+        cx = int((e.x - self.offset_x - (self.GRID_H * self.SZ - (e.y - self.offset_y)) * 0.1) // self.SZ)
+        cy = int((e.y - self.offset_y) // self.SZ)
         cx = max(0, min(self.GRID_W - 1, cx))
         cy = max(0, min(self.GRID_H - 1, cy))
 
@@ -553,11 +565,11 @@ class AlmoxarifadoManager3D:
                 self.agente.pos_entrega = f.pos_grid
                 self.agente.plano = [] 
                 
-                self.textos.append(TextoFlutuante(f.pos_grid[0]*self.SZ, f.pos_grid[1]*self.SZ - 20, 'ALVO FIXADO!', C['cyan']))
-                self._imprimir_matriz_terminal()
+                px, py = self.offset_x + f.pos_grid[0]*self.SZ, self.offset_y + f.pos_grid[1]*self.SZ - 20
+                self.textos.append(TextoFlutuante(px, py, 'ALVO FIXADO!', C['cyan']))
                 break
 
-    # ── MOTOR DE RENDERIZAÇÃO 3D ─────────────────────────────────────────────────────
+    # ── MOTOR DE RENDERIZAÇÃO 3D TOTALMENTE PROPORCIONAL E RELATIVO ────────────────
     def _draw_cube(self, c, x, y, w, h, d, c_f, c_t, c_s, outline='#000'):
         c.create_polygon(x, y-h, x+w, y-h, x+w+d, y-h-d, x+d, y-h-d, fill=c_t, outline=outline)
         c.create_polygon(x+w, y, x+w+d, y-d, x+w+d, y-h-d, x+w, y-h, fill=c_s, outline=outline)
@@ -567,23 +579,25 @@ class AlmoxarifadoManager3D:
         c = self.canvas
         c.delete('all')
         sz, d = self.SZ, self.DEPTH
+        ox, oy = self.offset_x, self.offset_y
 
         for x in range(self.GRID_W):
             for y in range(self.GRID_H):
                 col = C['floor_a'] if (x+y)%2==0 else C['floor_b']
-                c.create_rectangle(x*sz, y*sz, x*sz+sz, y*sz+sz, fill=col, outline=C['grid'])
+                c.create_rectangle(ox + x*sz, oy + y*sz, ox + x*sz+sz, oy + y*sz+sz, fill=col, outline=C['grid'])
 
-        yf = (self.GRID_H - 1) * sz
-        for x in range(0, self.GRID_W * sz, 20):
-            cor = C['stripe_1'] if (x // 20) % 2 == 0 else C['stripe_2']
-            c.create_rectangle(x, yf, x+20, yf+6, fill=cor, outline='')
+        yf = oy + (self.GRID_H - 1) * sz
+        stripe_w = max(5, int(sz*0.4))
+        for x in range(0, self.GRID_W * sz, stripe_w):
+            cor = C['stripe_1'] if (x // stripe_w) % 2 == 0 else C['stripe_2']
+            c.create_rectangle(ox + x, yf, ox + x+stripe_w, yf+max(2, int(sz*0.1)), fill=cor, outline='')
 
         base_x, base_y = self.pos_robo_inicial
-        bx, by = base_x * sz, base_y * sz
-        c.create_rectangle(bx+2, by+2, bx+sz-2, by+sz-2, fill='#022c22', outline=C['green'], width=2)
+        bx, by = ox + base_x * sz, oy + base_y * sz
+        pad = max(1, int(sz*0.05))
+        c.create_rectangle(bx+pad, by+pad, bx+sz-pad, by+sz-pad, fill='#022c22', outline=C['green'], width=2)
 
         render_list = []
-
         for (cx, cy), qtd in self.ambiente.prateleiras.items():
             render_list.append({'y': cy, 'draw': lambda cx=cx, cy=cy, q=qtd: self._draw_shelf(c, cx, cy, q, sz, d)})
 
@@ -607,57 +621,64 @@ class AlmoxarifadoManager3D:
             if ts > 0: c.create_rectangle(p.x, p.y, p.x+ts, p.y+ts, fill=p.cor, outline='')
 
         for t in self.textos:
-            c.create_text(int(t.x), int(t.y), text=t.texto, font=F['med'], fill=t.cor)
+            f_size = max(8, int(sz*0.25))
+            c.create_text(int(t.x), int(t.y), text=t.texto, font=('Courier New', f_size, 'bold'), fill=t.cor)
 
     def _draw_shelf(self, c, cx, cy, qtd, sz, d):
-        x, y = cx * sz + 4, cy * sz + sz - 4
-        c.create_polygon(x, y, x+sz-8, y, x+sz-8+d, y-d, x+d, y-d, fill='#000', stipple='gray50')
-        self._draw_cube(c, x, y, sz-8, int(sz*0.9), d, C['shelf_f'], C['shelf_t'], C['shelf_s'])
+        ox, oy = self.offset_x, self.offset_y
+        p1, p2 = int(sz*0.1), int(sz*0.2)
+        x, y = ox + cx * sz + p1, oy + cy * sz + sz - p1
+        c.create_polygon(x, y, x+sz-p2, y, x+sz-p2+d, y-d, x+d, y-d, fill='#000', stipple='gray50')
+        self._draw_cube(c, x, y, sz-p2, int(sz*0.9), d, C['shelf_f'], C['shelf_t'], C['shelf_s'])
         if qtd > 0:
-            bx, by = x + 8, y - int(sz*0.9)
-            self._draw_cube(c, bx, by, sz-24, 12, d-4, C['box_f'], C['box_t'], C['box_s'])
+            bx, by = x + p2, y - int(sz*0.9)
+            self._draw_cube(c, bx, by, sz-int(sz*0.6), int(sz*0.3), d-p1, C['box_f'], C['box_t'], C['box_s'])
 
     def _draw_desk(self, c, cx, cy, sz, d):
-        x, y = cx * sz, cy * sz + sz
+        x, y = self.offset_x + cx * sz, self.offset_y + cy * sz + sz
         self._draw_cube(c, x, y, sz, int(sz*0.5), d, C['desk_f'], C['desk_t'], C['desk_s'])
 
     def _draw_robot(self, c, cx, cy, sz, d, tem_caixa):
-        x, y = cx * sz + 8, cy * sz + sz - 5
-        bob = int(math.sin(self.tick * 0.4) * 3)
-        c.create_oval(x, y-5, x+sz-16, y+5, fill='#000', outline='')
-        self._draw_cube(c, x, y+bob, sz-16, int(sz*0.5), d, C['robo_f'], C['robo_t'], C['robo_s'])
+        x, y = self.offset_x + cx * sz + int(sz*0.2), self.offset_y + cy * sz + sz - int(sz*0.1)
+        bob = int(math.sin(self.tick * 0.4) * max(1, int(sz*0.07)))
+        c.create_oval(x, y-5, x+sz-int(sz*0.4), y+5, fill='#000', outline='')
+        self._draw_cube(c, x, y+bob, sz-int(sz*0.4), int(sz*0.5), d, C['robo_f'], C['robo_t'], C['robo_s'])
         
         olho_cor = C['cyan'] if not tem_caixa else C['yellow']
-        c.create_rectangle(x+4, y-int(sz*0.4)+bob, x+10, y-int(sz*0.3)+bob, fill=olho_cor, outline='')
-        c.create_rectangle(x+14, y-int(sz*0.4)+bob, x+20, y-int(sz*0.3)+bob, fill=olho_cor, outline='')
+        c.create_rectangle(x+int(sz*0.1), y-int(sz*0.4)+bob, x+int(sz*0.25), y-int(sz*0.3)+bob, fill=olho_cor, outline='')
+        c.create_rectangle(x+int(sz*0.35), y-int(sz*0.4)+bob, x+int(sz*0.5), y-int(sz*0.3)+bob, fill=olho_cor, outline='')
         if tem_caixa:
-            self._draw_cube(c, x+4, y-int(sz*0.6)+bob, sz-24, 10, d-4, C['box_f'], C['box_t'], C['box_s'])
+            self._draw_cube(c, x+int(sz*0.1), y-int(sz*0.6)+bob, sz-int(sz*0.6), int(sz*0.25), d-max(1, int(sz*0.1)), C['box_f'], C['box_t'], C['box_s'])
 
     def _draw_worker(self, c, f, sz, d):
-        cx, cy = f.pos_grid
-        x, y = cx * sz + 12 + f.tremor, cy * sz + sz - f.offset_y
-        self._draw_cube(c, x, y, sz-24, int(sz*0.5), d-4, f.c_f, f.c_t, f.c_s)
-        self._draw_cube(c, x+4, y-int(sz*0.5), 12, 12, 6, C['pele'], '#fde047', C['pele_esc'])
+        x = self.offset_x + f.pos_grid[0] * sz + int(sz*0.3) + f.tremor
+        y = self.offset_y + f.pos_grid[1] * sz + sz - int(f.offset_y * (sz/60))
+        self._draw_cube(c, x, y, sz-int(sz*0.6), int(sz*0.5), d-max(1, int(sz*0.1)), f.c_f, f.c_t, f.c_s)
+        self._draw_cube(c, x+int(sz*0.1), y-int(sz*0.5), int(sz*0.3), int(sz*0.3), max(2, int(sz*0.15)), C['pele'], '#fde047', C['pele_esc'])
         
-        pct = f.paciencia / f.paciencia_max
         if f == self.funcionario_alvo:
-            c.create_polygon(x+8, y-sz-10, x+2, y-sz-25, x+14, y-sz-25, fill=C['yellow'], outline='#000')
+            c.create_polygon(x+int(sz*0.2), y-sz-int(sz*0.2), x+int(sz*0.05), y-sz-int(sz*0.6), x+int(sz*0.35), y-sz-int(sz*0.6), fill=C['yellow'], outline='#000')
 
+        pct = f.paciencia / f.paciencia_max
         cor_bar = C['green'] if pct > 0.5 else (C['yellow'] if pct > 0.25 else C['red'])
-        c.create_rectangle(x-4, y+6, x+sz-16, y+10, fill='#000', outline='')
-        c.create_rectangle(x-4, y+6, x-4 + int((sz-12)*pct), y+10, fill=cor_bar, outline='')
+        c.create_rectangle(x-int(sz*0.1), y+int(sz*0.15), x+sz-int(sz*0.4), y+int(sz*0.25), fill='#000', outline='')
+        c.create_rectangle(x-int(sz*0.1), y+int(sz*0.15), x-int(sz*0.1) + int((sz-int(sz*0.3))*pct), y+int(sz*0.25), fill=cor_bar, outline='')
 
     def _draw_invader(self, c, inv, sz, d):
-        x, y = inv.x * sz + 10, inv.y * sz + sz
-        bob = abs(int(math.sin(self.tick * 0.5) * 6))
-        self._draw_cube(c, x, y-bob, sz-20, int(sz*0.6), d, C['invader_f'], C['invader_t'], C['invader_s'])
-        c.create_text(x+10, y-int(sz*0.8)-bob, text='!', font=F['hud'], fill=C['white'])
+        x, y = self.offset_x + inv.x * sz + int(sz*0.25), self.offset_y + inv.y * sz + sz
+        bob = abs(int(math.sin(self.tick * 0.5) * max(1, int(sz*0.15))))
+        self._draw_cube(c, x, y-bob, sz-int(sz*0.5), int(sz*0.6), d, C['invader_f'], C['invader_t'], C['invader_s'])
+        
+        f_size = max(8, int(sz*0.3))
+        c.create_text(x+int(sz*0.25), y-int(sz*0.8)-bob, text='!', font=('Courier New', f_size, 'bold'), fill=C['white'])
 
     # ── PAINEL LATERAL E RADAR ───────────────────────────────────────────────────────
     def _render_painel(self):
         c = self.painel
         c.delete('all')
-        W, H = int(c['width']), int(c['height'])
+        W = c.winfo_width()
+        H = c.winfo_height()
+        if W < 10 or H < 10: return
         
         c.create_rectangle(0, 0, W, H, fill=C['bg_panel'], outline='')
         c.create_rectangle(0, 0, W, 40, fill=C['border'], outline='')
@@ -672,10 +693,8 @@ class AlmoxarifadoManager3D:
         for x in range(self.GRID_W):
             for y in range(self.GRID_H):
                 rx, ry = mx + x*map_sz, my + y*map_sz
-                if (x, y) in self.prateleiras:
-                    c.create_rectangle(rx+1, ry+1, rx+map_sz-1, ry+map_sz-1, fill=C['shelf_t'], outline='')
-                if y == self.GRID_H - 1:
-                    c.create_rectangle(rx, ry, rx+map_sz, ry+map_sz, fill=C['gray_dark'], outline='')
+                if (x, y) in self.prateleiras: c.create_rectangle(rx+1, ry+1, rx+map_sz-1, ry+map_sz-1, fill=C['shelf_t'], outline='')
+                if y == self.GRID_H - 1: c.create_rectangle(rx, ry, rx+map_sz, ry+map_sz, fill=C['gray_dark'], outline='')
 
         bx, by = self.pos_robo_inicial
         c.create_rectangle(mx+bx*map_sz+1, my+by*map_sz+1, mx+bx*map_sz+map_sz-1, my+by*map_sz+map_sz-1, fill='#022c22', outline='')
@@ -713,65 +732,79 @@ class AlmoxarifadoManager3D:
     def _render_hud(self):
         c = self.hud
         c.delete('all')
-        W = int(c['width'])
+        W = c.winfo_width()
+        if W < 50: return
         
         c.create_rectangle(0, 0, W, 60, fill=C['bg_panel'], outline='')
         c.create_text(15, 30, anchor='w', text='[ ALMOXARIFADO 3D ]', font=F['med'], fill=C['cyan'])
         c.create_text(220, 30, anchor='w', text=f'GESTOR: {self.nome_jogador}', font=F['small'], fill=C['white'])
         
-        c.create_text(400, 20, text='SCORE', font=F['micro'], fill=C['gray'])
-        c.create_text(400, 40, text=f'{self.score:06d}', font=F['score'], fill=C['yellow'])
+        # Alinhamento dinâmico encostado à direita para ultrawides
+        c.create_text(W - 350, 20, text='SCORE', font=F['micro'], fill=C['gray'])
+        c.create_text(W - 350, 40, text=f'{self.score:06d}', font=F['score'], fill=C['yellow'])
         
-        c.create_text(550, 20, text='ENTREGAS/LVL', font=F['micro'], fill=C['gray'])
-        c.create_text(550, 40, text=f'{self.entregas:03d} / LVL {self.dificuldade+1}', font=F['med'], fill=C['white'])
+        c.create_text(W - 200, 20, text='ENTREGAS/LVL', font=F['micro'], fill=C['gray'])
+        c.create_text(W - 200, 40, text=f'{self.entregas:03d} / LVL {self.dificuldade+1}', font=F['med'], fill=C['white'])
         
         rep_col = C['green'] if self.reputacao > 50 else (C['yellow'] if self.reputacao > 25 else C['red'])
-        c.create_text(700, 20, text='REPUTAÇÃO', font=F['micro'], fill=C['gray'])
-        c.create_rectangle(640, 30, 760, 45, fill='#000', outline=rep_col)
-        c.create_rectangle(642, 32, 642 + int(116 * (self.reputacao/100)), 43, fill=rep_col, outline='')
+        rep_x = W - 70
+        c.create_text(rep_x, 20, text='REPUTAÇÃO', font=F['micro'], fill=C['gray'])
+        c.create_rectangle(rep_x - 50, 30, rep_x + 50, 45, fill='#000', outline=rep_col)
+        c.create_rectangle(rep_x - 48, 32, rep_x - 48 + int(96 * (self.reputacao/100)), 43, fill=rep_col, outline='')
 
-    # ── TELAS DE SISTEMA (MENU / PAUSE / GAMEOVER) ───────────────────────────────────
+    # ── TELAS DE SISTEMA DINÂMICAS (MENU / PAUSE / GAMEOVER) ─────────────────────────
     def _render_menu(self):
         c = self.canvas
         c.delete('all')
-        W, H = int(c['width']), int(c['height'])
+        W, H = c.winfo_width(), c.winfo_height()
+        if W < 10 or H < 10: return
         
-        for i in range(0, max(W, H), 40):
+        for i in range(0, max(W, H), 60):
             offset = (self.tick + i) % max(W, H)
             c.create_line(offset, 0, offset, H, fill=C['border'], width=1)
             c.create_line(0, offset, W, offset, fill=C['border'], width=1)
             
         cw = min(500, W - 40)
         cx = (W - cw) // 2
-        cy_top = H // 2 - 140
+        cy_top = H // 2 - 150
         
-        c.create_rectangle(cx, cy_top, cx+cw, cy_top + 120, fill=C['bg_panel'], outline=C['cyan'], width=2)
-        c.create_text(W//2, cy_top + 40, text='ALMOXARIFADO 3D', font=F['giant'], fill=C['cyan'])
-        c.create_text(W//2, cy_top + 80, text='SURVIVAL LOGISTICS', font=F['title'], fill=C['yellow'])
+        c.create_rectangle(cx, cy_top, cx+cw, cy_top + 100, fill=C['bg_panel'], outline=C['cyan'], width=2)
+        c.create_text(W//2, cy_top + 35, text='ALMOXARIFADO 3D', font=F['giant'], fill=C['cyan'])
+        c.create_text(W//2, cy_top + 70, text='SURVIVAL LOGISTICS', font=F['title'], fill=C['yellow'])
         
         if int(self.tick / 10) % 2 == 0:
-            c.create_text(W//2, cy_top + 150, text='[ PRESSIONE ESPAÇO PARA INICIAR ]', font=F['med'], fill=C['white'])
+            c.create_text(W//2, cy_top + 130, text='[ PRESSIONE ESPAÇO PARA INICIAR ]', font=F['med'], fill=C['white'])
             
-        cy_board = cy_top + 180
-        c.create_rectangle(cx, cy_board, cx+cw, cy_board + 220, fill=C['bg_panel'], outline=C['border_hl'], width=3)
+        cy_board = cy_top + 160
+        c.create_rectangle(cx, cy_board, cx+cw, cy_board + 230, fill=C['bg_panel'], outline=C['border_hl'], width=3)
         c.create_text(W//2, cy_board + 30, text='--- MELHORES GESTORES ---', font=F['med'], fill=C['cyan'])
         
-        y = cy_board + 70
-        for i, reg in enumerate(self.leaderboard[:5]): # Reduzido para caber bem na tela pequena
-            cor = C['yellow'] if i == 0 else C['white']
-            c.create_text(W//2 - 150, y, anchor='w', text=f"{i+1}. {reg['nome']}", font=F['med'], fill=cor)
-            c.create_text(W//2 + 150, y, anchor='e', text=f"{reg['score']:06d} PTS", font=F['med'], fill=cor)
+        itens_por_pagina = 5
+        max_pag = max(1, math.ceil(len(self.leaderboard) / itens_por_pagina))
+        if self.pagina_leaderboard >= max_pag: self.pagina_leaderboard = max_pag - 1
+            
+        pag_atual = self.pagina_leaderboard + 1
+        inicio = self.pagina_leaderboard * itens_por_pagina
+        registros_pagina = self.leaderboard[inicio:inicio + itens_por_pagina]
+
+        y = cy_board + 65
+        for i, reg in enumerate(registros_pagina):
+            pos_real = inicio + i + 1
+            cor = C['yellow'] if pos_real == 1 else C['white']
+            c.create_text(W//2 - 160, y, anchor='w', text=f"{pos_real:02d}. {reg['nome']}", font=F['med'], fill=cor)
+            c.create_text(W//2 + 160, y, anchor='e', text=f"{reg['score']:06d} PTS", font=F['med'], fill=cor)
             y += 25
             
+        c.create_text(W//2, cy_board + 205, text=f'[<-] Página {pag_atual}/{max_pag} [->]', font=F['small'], fill=C['gray'])
         self.painel.delete('all')
         self.hud.delete('all')
 
     def _render_pause(self):
         c = self.canvas
-        W, H = int(c['width']), int(c['height'])
+        W, H = c.winfo_width(), c.winfo_height()
+        if W < 10 or H < 10: return
         
         c.create_rectangle(0, 0, W, H, fill='#000', stipple='gray50')
-        
         pw, ph = 300, 250
         px, py = (W - pw)//2, (H - ph)//2
         c.create_rectangle(px, py, px+pw, py+ph, fill=C['bg_panel'], outline=C['cyan'], width=4)
@@ -782,14 +815,14 @@ class AlmoxarifadoManager3D:
             'MENU':      (W//2 - 100, py + 140, W//2 + 100, py + 180),
             'SAIR':      (W//2 - 100, py + 200, W//2 + 100, py + 240)
         }
-        
         for texto, (x1, y1, x2, y2) in self.botoes_pause.items():
             c.create_rectangle(x1, y1, x2, y2, fill=C['border'], outline=C['cyan'], width=2)
             c.create_text((x1+x2)//2, (y1+y2)//2, text=texto, font=F['med'], fill=C['white'])
 
     def _render_gameover(self):
         c = self.canvas
-        W, H = int(c['width']), int(c['height'])
+        W, H = c.winfo_width(), c.winfo_height()
+        if W < 10 or H < 10: return
         
         c.create_rectangle(0, 0, W, H, fill='#000', stipple='gray50')
         pw, ph = 500, 250
@@ -798,7 +831,6 @@ class AlmoxarifadoManager3D:
         
         c.create_text(W//2, py + 40, text='GAME OVER', font=F['giant'], fill=C['red'])
         c.create_text(W//2, py + 100, text=self.motivo_gameover, font=F['med'], fill=C['yellow'])
-        
         c.create_text(W//2, py + 150, text=f'PONTUAÇÃO: {self.score:06d}', font=F['title'], fill=C['white'])
         c.create_text(W//2, py + 180, text=f'NÍVEL: {self.dificuldade + 1}', font=F['med'], fill=C['gray'])
         
