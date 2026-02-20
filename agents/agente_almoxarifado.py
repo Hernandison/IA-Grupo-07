@@ -10,16 +10,42 @@ class AgenteAlmoxarifado(Agent):
         self.largura_grid = largura_grid
         self.altura_grid = altura_grid
         # dados_prateleiras é um dicionário {(x,y): quantidade}
-        self.memoria_prateleiras = dados_prateleiras.copy() 
+        self.memoria_prateleiras = dados_prateleiras.copy()
         self.pos_entrega = pos_entrega
         self.plano = []
         self.alvo_atual = None
+        # Conjunto de prateleiras confirmadas como inacessíveis (cercadas de obstáculos)
+        self._inacessiveis = set()
+        # Sinaliza ao ambiente que não há mais nada a fazer (layout impossível)
+        self.missao_impossivel = False
+
+    def _buscar_caminho(self, estado_inicial, obstaculos, alvo):
+        """Tenta encontrar caminho via A*. Retorna lista de ações ou None."""
+        prob = ProblemaAlmoxarifado(
+            estado_inicial, obstaculos, alvo,
+            self.pos_entrega, self.largura_grid, self.altura_grid
+        )
+        no_solucao = astar_search(prob)
+        return no_solucao.solution() if no_solucao else None
+
+    def _vizinhos_livres(self, pos, obstaculos):
+        """Retorna as células adjacentes à posição que não são obstáculos."""
+        x, y = pos
+        candidatos = [
+            (x, y - 1), (x, y + 1), (x - 1, y), (x + 1, y)
+        ]
+        return [
+            p for p in candidatos
+            if 0 <= p[0] < self.largura_grid
+            and 0 <= p[1] < self.altura_grid
+            and p not in obstaculos
+        ]
 
     def programa_agente(self, percepcao):
         """Decide qual ação tomar com base no que percebe do ambiente."""
         pos_atual = percepcao['posicao']
         tem_caixa = percepcao['tem_caixa']
-        
+
         # Se tem um plano na memória, apenas executa o próximo passo
         if self.plano:
             return self.plano.pop(0)
@@ -32,43 +58,73 @@ class AgenteAlmoxarifado(Agent):
         # ProblemaAlmoxarifado para guiar a busca de forma eficiente até o objetivo.
         # -----------------------------------------------------------------------------------
 
-        # Se não tem plano, aciona a IA para decidir o que fazer
         if tem_caixa:
-            # 1. Sub-objetivo: Levar caixa ao balcão
+            # ----------------------------------------------------------------
+            # Sub-objetivo: Levar caixa ao balcão
+            # ----------------------------------------------------------------
             obstaculos = set(self.memoria_prateleiras.keys())
-            prob = ProblemaAlmoxarifado((pos_atual[0], pos_atual[1], 1), obstaculos, self.pos_entrega, self.pos_entrega, self.largura_grid, self.altura_grid)
-            
-            # Executa a busca A* para encontrar a melhor rota até o ponto de entrega
-            no_solucao = astar_search(prob)
-            
-            if no_solucao:
-                self.plano = no_solucao.solution() # solution() retorna a lista de ações (o plano)
-                self.plano.append('Entregar')      # Adiciona a ação final de interação
-                return self.plano.pop(0) if self.plano else 'NoOp'
-                
+            acoes = self._buscar_caminho(
+                (pos_atual[0], pos_atual[1], 1), obstaculos, self.pos_entrega
+            )
+
+            if acoes is not None:
+                self.plano = acoes
+                self.plano.append('Entregar')
+                return self.plano.pop(0)
+
+            # ── Balcão inacessível diretamente: tenta chegar a um vizinho livre ──
+            vizinhos = self._vizinhos_livres(self.pos_entrega, obstaculos)
+            vizinhos.sort(key=lambda p: abs(p[0] - pos_atual[0]) + abs(p[1] - pos_atual[1]))
+            for viz in vizinhos:
+                acoes = self._buscar_caminho(
+                    (pos_atual[0], pos_atual[1], 1), obstaculos, viz
+                )
+                if acoes is not None:
+                    print(f"[AGENTE] Balcão cercado. Roteando para vizinho livre {viz}.")
+                    self.plano = acoes
+                    # Ao chegar no vizinho, tenta entrar no balcão pelo lado acessível
+                    # na próxima chamada do programa_agente
+                    return self.plano.pop(0)
+
+            # Totalmente impossível entregar — encerra para não travar em loop
+            print("[AGENTE] AVISO: balcão totalmente inacessível. Encerrando.")
+            self.missao_impossivel = True
+            return 'NoOp'
+
         else:
-            # 2. Sub-objetivo: Buscar novo item
-            prateleiras_disponiveis = [pos for pos, qtd in self.memoria_prateleiras.items() if qtd > 0]
-            
+            # ----------------------------------------------------------------
+            # Sub-objetivo: Buscar novo item
+            # ----------------------------------------------------------------
+            prateleiras_disponiveis = [
+                pos for pos, qtd in self.memoria_prateleiras.items()
+                if qtd > 0 and pos not in self._inacessiveis
+            ]
+
             if not prateleiras_disponiveis:
-                return 'NoOp' # Acabou o trabalho, não há mais itens!
+                return 'NoOp'  # Sem itens restantes acessíveis
 
-            # Escolher a prateleira mais próxima (Heurística Gulosa simples para escolher o alvo)
-            prateleiras_disponiveis.sort(key=lambda p: abs(p[0]-pos_atual[0]) + abs(p[1]-pos_atual[1]))
-            alvo = prateleiras_disponiveis[0]
-            
-            # Obstáculos são todas as prateleiras MENOS a alvo
-            obstaculos = set(self.memoria_prateleiras.keys()) - {alvo}
-            
-            prob = ProblemaAlmoxarifado((pos_atual[0], pos_atual[1], 0), obstaculos, alvo, self.pos_entrega, self.largura_grid, self.altura_grid)
-            
-            # Executa a busca A* para encontrar a melhor rota até a prateleira escolhida
-            no_solucao = astar_search(prob)
-            
-            if no_solucao:
-                self.plano = no_solucao.solution() # Extrai a sequência de movimentos do A*
-                self.plano.append('Pegar')         # Adiciona a ação final de interação
-                self.alvo_atual = alvo 
-                return self.plano.pop(0) if self.plano else 'NoOp'
+            # Tenta cada prateleira em ordem crescente de distância Manhattan
+            prateleiras_disponiveis.sort(
+                key=lambda p: abs(p[0] - pos_atual[0]) + abs(p[1] - pos_atual[1])
+            )
 
-        return 'NoOp'
+            for alvo in prateleiras_disponiveis:
+                obstaculos = set(self.memoria_prateleiras.keys()) - {alvo}
+                acoes = self._buscar_caminho(
+                    (pos_atual[0], pos_atual[1], 0), obstaculos, alvo
+                )
+
+                if acoes is not None:
+                    self.plano = acoes
+                    self.plano.append('Pegar')
+                    self.alvo_atual = alvo
+                    return self.plano.pop(0)
+
+                # Sem caminho para este alvo: marca como inacessível
+                print(f"[AGENTE] Prateleira {alvo} inacessível. Ignorando.")
+                self._inacessiveis.add(alvo)
+
+            # Todas as prateleiras com item estão cercadas
+            print("[AGENTE] AVISO: nenhuma prateleira acessível. Encerrando missão.")
+            self.missao_impossivel = True
+            return 'NoOp'

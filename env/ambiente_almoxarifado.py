@@ -52,10 +52,17 @@ class AmbienteAlmoxarifado(Environment):
                 dados['itens_entregues'] += 1
 
     def is_done(self):
-        """O ambiente encerra quando não há mais itens."""
+        """O ambiente encerra quando não há mais itens ou quando a missão é impossível."""
         total_itens_restantes = sum(self.prateleiras.values())
         agentes_carregando = any(d['tem_caixa'] for d in self.dados_agentes.values())
-        return total_itens_restantes == 0 and not agentes_carregando
+        # Encerra normalmente quando todos os itens foram entregues
+        if total_itens_restantes == 0 and not agentes_carregando:
+            return True
+        # Encerra com aviso se o agente detectou que o layout é insolúvel ou entrega impossível
+        if any(getattr(ag, 'missao_impossivel', False) for ag in self.agents):
+            print("[AMBIENTE] Missão encerrada: layout insolúvel (alvo inacessível).")
+            return True
+        return False
 
     def step(self):
         """Executa um passo temporal e desenha o estado atual."""

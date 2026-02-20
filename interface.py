@@ -297,7 +297,18 @@ class JogoSuperAlmoxarifado:
         if self.ambiente.is_done():
             self.em_execucao = False
             self.btn_iniciar.config(state=tk.NORMAL, bg="#27ae60", text="INICIAR MISSÃO")
-            messagebox.showinfo("Sucesso", "Missão Cumprida!\nTodas as entregas realizadas.")
+            # Verifica se encerrou por layout impossível ou por sucesso real
+            layout_impossivel = any(
+                getattr(ag, 'missao_impossivel', False) for ag in self.ambiente.agents
+            )
+            if layout_impossivel:
+                messagebox.showwarning(
+                    "Layout Insolúvel",
+                    "O agente não consegue acessar todos os alvos.\n"
+                    "Verifique se prateleiras ou o balcão estão completamente cercados."
+                )
+            else:
+                messagebox.showinfo("Sucesso", "Missão Cumprida!\nTodas as entregas realizadas.")
             return
 
         # Executa 1 passo na lógica
