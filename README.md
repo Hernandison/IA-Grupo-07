@@ -2,27 +2,27 @@
 
 **Disciplina:** Inteligência Artificial  
 **Grupo:** 07  
-**Integrantes:** Niceu Santos Biriba, Hernandison da Silva Bispo, Letícia Oliveira, João Marcos  
+**Integrantes:** Niceu Santos Biriba, Hernandison da Silva Bispo, Letícia Caroline da Silva Oliveira, João Marcos  
 
 ---
 
 ## 1) Objetivo do Projeto
 
-Implementar um **agente inteligente baseado em busca** para resolver um problema **original** proposto pelo grupo (logistica de um almoxarifado automatizado), usando os conceitos do AIMA e as classes base do repositório `aima-python`.
+Implementar um **agente inteligente baseado em busca** para resolver um problema **original** proposto pelo grupo (logística de um almoxarifado automatizado), usando os conceitos do AIMA e as classes base do repositório `aima-python`.
 
 O objetivo inclui, explicitamente:
 - **Arquitetura Ambiente – Agente – Programa de Agente** bem definida e separada;
-- **Uso de busca dentro do programa do agente** (nao como chamada isolada);
+- **Uso de busca dentro do programa do agente** (não como chamada isolada);
 - **Modelagem formal do problema** com `Problem`, `Environment` e `Agent` do AIMA;
-- **Justificativas** das decisoes de modelagem, dos algoritmos escolhidos e das limitacoes.
+- **Justificativas** das decisões de modelagem, dos algoritmos escolhidos e das limitações.
 
 O problema foi modelado como um **ambiente de grade (Grid World)**, no qual o agente deve planejar rotas inteligentes para:
 
-- Navegar atraves de obstaculos (prateleiras/paredes);
-- Localizar e coletar itens distribuidos no armazem;
-- Transportar os itens ate a zona de entrega (Balcao).
+- Navegar através de obstáculos (prateleiras/paredes);
+- Localizar e coletar itens distribuídos no armazém;
+- Transportar os itens até a zona de entrega (Balcão).
 
-A solucao utiliza a arquitetura **Ambiente – Agente – Programa de Agente** e aplica o algoritmo de busca **A\\*** (A-Star), conforme Russell & Norvig (AIMA), para encontrar o caminho mais curto ate os objetivos.
+A solução utiliza a arquitetura **Ambiente – Agente – Programa de Agente** e aplica o algoritmo de busca **A\*** (A-Star), conforme Russell & Norvig (AIMA), para encontrar o caminho mais curto até os objetivos.
 
 ---
 
