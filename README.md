@@ -322,7 +322,7 @@ Este projeto utiliza os conceitos dos **Capítulos 2, 3 e 4** do livro AIMA. A s
      - **Especificamente no Almoxarifado**: Obstáculos em "U" são um pesadelo. Greedy segue reto para o alvo, entra no U, e depois já não consegue retroceder inteligentemente como faria o A*.
 
 6. **Bidirectional Search** (Problem 3.15 / generalized in Chapter 4)
-   - **Porquê não usar**: Seria necessário conhecer o mapa a partir do alvo (backward), o que não é natural para este problema. Complexidade é reduzida a O(bd/2), mas no nosso caso com A*, a velocidade já é excelente.
+   - **Porquê não usar**: Seria necessário conhecer o mapa a partir do alvo (backward), o que não é natural para este problema. Complexidade é reduzida a ≈ O(b^(d/2)), mas no nosso caso com A*, a velocidade já é excelente.
 
 ---
 
