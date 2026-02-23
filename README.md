@@ -367,7 +367,7 @@ def h(self, node):
     return distancia((x, y), self.alvo)
 ```
 
-**Intuição**: Num grid onde o robô se pode mover em 4 direções discretas (N, S, E, O), o número mínimo de passos para ir de um ponto (x1, y1) até (x2, y2) é: h(n) = |x2 − x1| + |y2 − y1|
+**Intuição**: Num grid onde o robô se pode mover em 4 direções discretas (N, S, L, O), o número mínimo de passos para ir de um ponto (x1, y1) até (x2, y2) é: h(n) = |x2 − x1| + |y2 − y1|
 
 Esta é uma estimativa "perfeita" do custo real **quando não há obstáculos**; com obstáculos, é uma subestimação (logo admissível).
 
