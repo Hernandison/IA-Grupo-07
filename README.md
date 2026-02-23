@@ -367,7 +367,7 @@ def h(self, node):
     return distancia((x, y), self.alvo)
 ```
 
-**Intuição**: Num grid onde o robô se pode mover em 4 direções discretas (N, S, L, O), o número mínimo de passos para ir de um ponto (x1, y1) até (x2, y2) é: h(n) = |x2 − x1| + |y2 − y1|
+**Intuição**: Num grid onde o robô pode se mover em 4 direções discretas (N, S, L, O), o número mínimo de passos para ir de um ponto (x1, y1) até (x2, y2) é: h(n) = |x2 − x1| + |y2 − y1|
 
 Esta é uma estimativa "perfeita" do custo real **quando não há obstáculos**; com obstáculos, é uma subestimação (logo admissível).
 
@@ -417,13 +417,13 @@ Uma heurística é **consistente** se, para cada ação a que leva de n para n' 
 
 ### 6.5) Resumo Final: Algoritmos do Projeto
 
-**Utilizados (Effectively):**
+**Utilizados:**
 - A* Search com heurística de Manhattan
 
-**Considerados mas descartados (Informally):**
+**Considerados mas descartados:**
 - BFS, DFS, UCS, Greedy Best-First, Hill Climbing, Simulated Annealing, Genetic Algorithms, AND-OR Search
 
-**Razão central:** O problema é uma **navegação em grafo determinístico com estado objetivo conhecido**. Isto aponta directamente para:
+**Razão central:** O problema é uma **navegação em grafo determinístico com estado objetivo conhecido**. Isto aponta diretamente para:
 1. Algoritmos informados (heurísticos) em vez de desinformados.
 2. Busca em grafo (A*) em vez de busca local (Hill Climbing, etc).
 3. Heurística admissível e consistente (Manhattan) em vez de nenhuma ou arbitrária.
