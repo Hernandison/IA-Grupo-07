@@ -322,7 +322,7 @@ Este projeto utiliza os conceitos dos **Capítulos 2, 3 e 4** do livro AIMA. A s
      - **Especificamente no Almoxarifado**: Obstáculos em "U" são um pesadelo. Greedy segue reto para o alvo, entra no U, e depois já não consegue retroceder inteligentemente como faria o A*.
 
 6. **Bidirectional Search** (Problem 3.15 / generalized in Chapter 4)
-   - **Porquê não usar**: Seria necessário conhecer o mapa a partir do alvo (backward), o que não é natural para este problema. Complexidade é reduzida a $ \approx O(b^{d/2}) $, mas no nosso caso com A*, a velocidade já é excelente.
+   - **Porquê não usar**: Seria necessário conhecer o mapa a partir do alvo (backward), o que não é natural para este problema. Complexidade é reduzida a O(bd/2), mas no nosso caso com A*, a velocidade já é excelente.
 
 ---
 
@@ -334,16 +334,16 @@ Este projeto utiliza os conceitos dos **Capítulos 2, 3 e 4** do livro AIMA. A s
 
 1. **Hill Climbing**
    - **Porquê não usar**: Hill Climbing é para problemas de **otimização** (não navigation). Exemplo: colocar 8 rainhas num tabuleiro ou otimizar a colocação de prateleiras no armazém.
-     - O problema do robô é uma **navegação em grafo exacta**, não otimização.
+     - O problema do robô é uma **navegação em grafo exata**, não otimização.
      - Além disso, fica preso em máximos locais (encurralado atrás de uma prateleira grande).
 
 2. **Simulated Annealing**
-   - **Porquê não usar**: Mesma razão que Hill Climbing. Mais: o parâmetro de "temperatura" seria arbitrário. Para navegação exacta, A* é incomparavelmente superior.
+   - **Porquê não usar**: Mesma razão que Hill Climbing. Mais: o parâmetro de "temperatura" seria arbitrário. Para navegação exata, A* é incomparavelmente superior.
 
 3. **Genetic Algorithms**
    - **Porquê não usar**: Algoritmos genéticos evoluem populações de soluções potenciais, misturando "genes" de pais. Servem para problemas onde o espaço de soluções é vastíssimo.
      - Para navegação em grafo, o espaço de caminhos é bem definido e A* o resolve deterministicamente e de forma ótima em tempo aceitável.
-     - Seria desperdiçador usar GA.
+     - Seria um desperdício usar GA.
 
 4. **Busca com Ações Não-Determinísticas (AND-OR Search, contingency planning)**
    - **Porquê não usar**: Método para ambientes com falhas / ações impredituosas (chão escorrega, motor falha, sensor erra).
@@ -367,32 +367,30 @@ def h(self, node):
     return distancia((x, y), self.alvo)
 ```
 
-**Intuição**: Num grid onde o robô se pode mover em 4 direções discretas (N, S, E, O), o número mínimo de passos para ir de um ponto $(x_1, y_1)$ até $(x_2, y_2)$ é:
-$$h(n) = |x_2 - x_1| + |y_2 - y_1|$$
+**Intuição**: Num grid onde o robô se pode mover em 4 direções discretas (N, S, E, O), o número mínimo de passos para ir de um ponto (x1, y1) até (x2, y2) é: h(n) = |x2 − x1| + |y2 − y1|
 
 Esta é uma estimativa "perfeita" do custo real **quando não há obstáculos**; com obstáculos, é uma subestimação (logo admissível).
 
 #### Admissibilidade
 
-Uma heurística é **admissível** se **nunca superestima** o custo real: $ h(n) \leq h^*(n) $ para todo nó $n$.
+Uma heurística é **admissível** se **nunca superestima** o custo real: h(n) ≤ h*(n) para todo nó n.
 
 **Prova para Manhattan:**
-- Sem obstáculos: o caminho ideal tem exatamente $ |x_2 - x_1| + |y_2 - y_1| $ passos. Logo $ h(n) = h^*(n) $.
-- Com obstáculos: o caminho real é mais longo (precisa de desvios). Logo $ h(n) < h^*(n) $.
+- Sem obstáculos: o caminho ideal tem exatamente |x2 - x1| + |y2 - y1| passos. Logo h(n) = h*(n).
+- Com obstáculos: o caminho real é mais longo (precisa de desvios). Logo h(n) < h*(n).
 - **✅ Manhattan é admissível.**
 
 **Consequência**: A* com heurística admissível é **ótimo** (encontra sempre o caminho de menor custo).
 
 #### Consistência (Monotocidade)
 
-Uma heurística é **consistente** se, para cada ação $a$ que leva de $n$ para $n'$ com custo $c(n,a,n')$:
-$$h(n) \leq c(n,a,n') + h(n')$$
+Uma heurística é **consistente** se, para cada ação a que leva de n para n' com custo c(n,a,n'): h(n) ≤ c(n, a, n') + h(n')
 
 **Prova para Manhattan:**
 - Cada ação de movimento custa exatamente `1` (um passo).
-- Quando o robô move de $(x, y)$ para $(x', y')$:
+- Quando o robô move de (x, y) para (x', y'):
   - A distância até ao alvo diminui de no máximo `1` (se avança diretamente) ou fica igual (se afasta).
-  - Logo: $ h(n) - h(n') \leq 1 = c(n,a,n') $.
+  - Logo: h(n) − h(n') ≤ 1 = c(n, a, n').
 - **✅ Manhattan é consistente.**
 
 **Consequência**: Com heurística consistente, A* **não redescobre nós** (o f-value nunca diminui ao longo de um caminho). Reduz drasticamente o número de expansões.
